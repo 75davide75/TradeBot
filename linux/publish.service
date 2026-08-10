@@ -1,0 +1,12 @@
+[Unit]
+Description=Pubblica i dati della dashboard su GitHub Pages
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=%i
+WorkingDirectory=/home/%i/trading
+ExecStart=/usr/bin/python3 /home/%i/trading/publish.py
+StandardOutput=journal
+StandardError=journal

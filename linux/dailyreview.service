@@ -1,0 +1,10 @@
+[Unit]
+Description=Revisione giornaliera del sistema di trading
+
+[Service]
+Type=oneshot
+User=%i
+WorkingDirectory=/home/%i/trading
+ExecStart=/usr/bin/python3 /home/%i/trading/daily_review.py
+StandardOutput=journal
+StandardError=journal

@@ -1,0 +1,114 @@
+<!DOCTYPE html><html lang="it"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TradeBot — dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+     background:#0f1115;color:#e6e6e6;padding:24px 20px 60px;max-width:1080px;margin:0 auto}
+h1{font-size:21px;font-weight:500}
+h2{font-size:16px;font-weight:500;margin:28px 0 12px}
+.sub{color:#8b8f98;font-size:13px;margin:4px 0 22px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:12px}
+.card{background:#171a21;border-radius:10px;padding:16px}
+.card .l{font-size:12px;color:#8b8f98;margin-bottom:6px}
+.card .v{font-size:23px;font-weight:500}
+.card .d{font-size:12px;margin-top:4px}
+.pos{color:#3fb950}.neg{color:#f85149}
+.warn{background:#241d0d;border:1px solid #5c4310;border-radius:10px;
+      padding:13px 15px;margin:18px 0;font-size:13.5px;color:#e3b341}
+.chart{background:#171a21;border-radius:10px;padding:18px;height:390px;margin-top:22px}
+table{width:100%;border-collapse:collapse;background:#171a21;border-radius:10px;
+      overflow:hidden;font-size:13px}
+th{text-align:left;padding:10px 12px;color:#8b8f98;font-weight:500;border-bottom:1px solid #23262e}
+td{padding:9px 12px;border-bottom:1px solid #1c1f26}
+tr:last-child td{border:0}
+.badge{padding:2px 8px;border-radius:4px;font-size:11px;white-space:nowrap}
+.open{background:#132d1a;color:#3fb950}.close{background:#2d1416;color:#f85149}
+.foot{color:#5c6069;font-size:12px;margin-top:34px;line-height:1.8}
+a{color:#4c8ed9}
+</style></head><body>
+
+<h1>TradeBot — dashboard</h1>
+<div class="sub" id="sub">caricamento…</div>
+<div id="alert"></div>
+<div class="cards" id="cards"></div>
+<div class="chart"><canvas id="c"></canvas></div>
+<h2>Operazioni</h2>
+<table id="tab"><thead><tr><th>Data</th><th>Tipo</th><th>Coppia</th><th>Prezzo</th>
+<th>Nozionale</th><th>Leva</th><th>Motivo</th></tr></thead><tbody></tbody></table>
+<div class="foot" id="foot"></div>
+
+<script>
+const eur = n => n==null ? '—' : n.toFixed(2)+' €';
+const pct = n => n==null ? '—' : (n>=0?'+':'')+(n*100).toFixed(2)+'%';
+const cls = n => n==null ? '' : (n>=0?'pos':'neg');
+
+fetch('data.json?t='+Date.now()).then(r=>r.json()).then(render).catch(e=>{
+  document.getElementById('sub').textContent =
+    'Impossibile caricare data.json — il Pi non ha ancora pubblicato i dati.';
+});
+
+function render(D){
+  const rEq = D.eq_ora/D.capitale - 1;
+  const rBh = D.bh_ora ? D.bh_ora/D.capitale - 1 : null;
+  const diff = rBh==null ? null : rEq - rBh;
+
+  document.getElementById('sub').textContent =
+    `Capitale iniziale ${D.capitale} € · ${D.n_ops} operazioni chiuse · `+
+    `${D.n_pos} posizioni aperte · aggiornato ${new Date(D.aggiornato).toLocaleString('it-IT')}`;
+
+  let a='';
+  if(D.halted) a+='<div class="warn">🟥 Sistema bloccato: '+(D.halt_reason||'')+'</div>';
+  if(D.paused) a+='<div class="warn">⏸️ Sistema in pausa — capitale liquidato.</div>';
+  if(D.n_ops < 30) a+='<div class="warn">⚠️ Solo '+D.n_ops+' operazioni chiuse. '+
+    'Sotto le ~30 qualunque risultato è statisticamente indistinguibile dal caso: '+
+    'questi numeri non dicono ancora se la strategia funziona.</div>';
+  document.getElementById('alert').innerHTML = a;
+
+  document.getElementById('cards').innerHTML = `
+    <div class="card"><div class="l">Portafoglio</div>
+      <div class="v ${cls(rEq)}">${eur(D.eq_ora)}</div>
+      <div class="d ${cls(rEq)}">${pct(rEq)}</div></div>
+    <div class="card"><div class="l">Se avessi comprato solo BTC</div>
+      <div class="v ${cls(rBh)}">${eur(D.bh_ora)}</div>
+      <div class="d ${cls(rBh)}">${pct(rBh)}</div></div>
+    <div class="card"><div class="l">Differenza vs BTC</div>
+      <div class="v ${cls(diff)}">${pct(diff)}</div>
+      <div class="d" style="color:#8b8f98">${diff==null?'dati insufficienti':
+        (diff>=0?'meglio di BTC':'peggio di BTC')}</div></div>
+    <div class="card"><div class="l">Operazioni chiuse</div>
+      <div class="v">${D.n_ops}</div>
+      <div class="d" style="color:#8b8f98">${D.n_ops<30?'campione insufficiente':'campione minimo raggiunto'}</div></div>`;
+
+  new Chart(document.getElementById('c'),{
+    type:'line',
+    data:{datasets:[
+      {label:'Portafoglio',data:D.equity,borderColor:'#2a78d6',
+       backgroundColor:'rgba(42,120,214,.09)',borderWidth:2,fill:true,pointRadius:0,tension:.15},
+      {label:'Solo BTC (buy & hold)',data:D.benchmark,borderColor:'#eb6834',
+       borderWidth:2,borderDash:[6,4],pointRadius:0,tension:.15,fill:false}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{legend:{labels:{color:'#8b8f98',usePointStyle:true,boxWidth:8,padding:16}},
+        tooltip:{callbacks:{label:c=>c.dataset.label+': '+c.parsed.y.toFixed(2)+' €'}}},
+      scales:{x:{type:'time',time:{unit:'day'},ticks:{color:'#8b8f98'},grid:{color:'#23262e'}},
+        y:{ticks:{color:'#8b8f98',callback:v=>v+' €'},grid:{color:'#23262e'}}}}});
+
+  document.querySelector('#tab tbody').innerHTML = D.ops.map(o=>{
+    const t = o.action==='open' ? 'apertura' : 'chiusura';
+    return `<tr><td>${new Date(o.ts).toLocaleString('it-IT')}</td>
+      <td><span class="badge ${o.action}">${t}</span></td>
+      <td>${o.pair||''}</td><td>${o.price?(+o.price).toFixed(4):''}</td>
+      <td>${o.notional?(+o.notional).toFixed(2)+' €':''}</td>
+      <td>${o.leverage&&+o.leverage?o.leverage+'x':''}</td>
+      <td style="color:#8b8f98">${o.reason||''}</td></tr>`;
+  }).join('') || '<tr><td colspan="7" style="color:#8b8f98">Nessuna operazione ancora</td></tr>';
+
+  document.getElementById('foot').innerHTML =
+    'Paper trading — nessun capitale reale impiegato. Il confronto con BTC buy-and-hold '+
+    'è calcolato sullo stesso identico periodo del portafoglio.<br>'+
+    'Codice: <a href="https://github.com/75davide75/TradeBot">github.com/75davide75/TradeBot</a>';
+}
+</script></body></html>

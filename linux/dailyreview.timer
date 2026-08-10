@@ -1,0 +1,10 @@
+[Unit]
+Description=Lancia la revisione giornaliera alle 13:30
+
+[Timer]
+OnCalendar=*-*-* 13:30:00
+# Se il Pi era spento all'orario previsto, recupera al riavvio
+Persistent=true
+
+[Install]
+WantedBy=timers.target

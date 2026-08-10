@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.davide.tradingbot</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/caffeinate</string>
+    <string>-i</string>
+    <string>/usr/bin/python3</string>
+    <string>/Users/davidesogos/Desktop/progetto trading/bot.py</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/davidesogos/Desktop/progetto trading</string>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>StandardOutPath</key>
+  <string>/Users/davidesogos/Desktop/progetto trading/bot.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/davidesogos/Desktop/progetto trading/bot.err.log</string>
+</dict>
+</plist>

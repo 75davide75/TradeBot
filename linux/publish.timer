@@ -1,0 +1,10 @@
+[Unit]
+Description=Pubblica i dati della dashboard ogni 30 minuti
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=30min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

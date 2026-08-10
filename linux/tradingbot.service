@@ -1,0 +1,22 @@
+[Unit]
+Description=Trading bot paper — segnali Telegram
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=%i
+WorkingDirectory=/home/%i/trading
+ExecStart=/usr/bin/python3 /home/%i/trading/bot.py
+
+Restart=always
+RestartSec=30
+
+# I log vanno a journald, non su file: niente crescita infinita
+# e niente usura inutile della SD. Si leggono con:
+#   journalctl -u tradingbot -f
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

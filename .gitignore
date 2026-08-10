@@ -1,0 +1,34 @@
+# ---------------------------------------------------------------------------
+# SEGRETI — mai committare. La repo e' PUBBLICA.
+# config.json contiene il token del bot Telegram: chiunque lo legga puo'
+# controllare il tuo bot. Gli scanner automatici setacciano i commit pubblici
+# in continuazione e trovano i token in pochi minuti.
+# ---------------------------------------------------------------------------
+config.json
+*.key
+*.pem
+.env
+
+# ---------------------------------------------------------------------------
+# DATI DI STATO — vivono sul Pi, non nel repo.
+# Sono la storia reale del sistema: se li committi e poi fai pull altrove,
+# rischi di sovrascrivere i dati veri con una versione vecchia.
+# ---------------------------------------------------------------------------
+state.json
+state.json.tmp
+journal.csv
+report/
+
+# log
+*.log
+bot.err.log
+review.err.log
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# sistema
+.DS_Store

@@ -1,0 +1,17 @@
+[Unit]
+Description=Dashboard web del sistema di trading
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=%i
+WorkingDirectory=/home/%i/trading
+ExecStart=/usr/bin/python3 /home/%i/trading/dashboard.py
+Restart=always
+RestartSec=15
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
