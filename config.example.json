@@ -17,8 +17,9 @@
   "momentum_n": 60,
   "allow_short": true,
 
-  "_nota_universo": "Con capitale piccolo servono poche coppie: divise su troppe, le posizioni scendono sotto il minimo d'ordine Kraken e verrebbero rifiutate.",
-  "universe": ["XXBTZEUR", "XETHZEUR", "XXRPZEUR"],
+  "_nota_universo": "Il numero di coppie va scelto in base al capitale: divise su troppe, le posizioni scendono sotto il minimo d'ordine Kraken e verrebbero rifiutate. Con 100 EUR ne reggiamo 8 (12.50 EUR ciascuna, sopra tutti i minimi). Con 20 EUR se ne reggevano 3. Piu' mercati indipendenti = miglior rapporto rendimento/rischio, che cresce con la radice del loro numero.",
+  "universe": ["XXBTZEUR", "XETHZEUR", "XXRPZEUR", "SOLEUR", "LINKEUR",
+               "XLTCZEUR", "ADAEUR", "DOTEUR"],
 
   "check_interval_min": 240,
 
