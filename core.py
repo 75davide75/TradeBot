@@ -56,6 +56,15 @@ DEFAULTS = {
     "auto_close_timeout_sec": 60,
     "safe_asset": "EUR",
     "dashboard_port": 8080,
+    # Esecuzione automatica: nessun bottone, solo notifica a cosa fatta.
+    # Vale SOLO in paper. Se un giorno ci fossero soldi veri, la conferma
+    # umana e' l'ultima cosa tra un bug e il conto.
+    "auto_execute": True,
+    # Il segnale deve restare invariato per N controlli prima di agire.
+    # Su candele giornaliere ancora aperte il segnale oscilla durante la
+    # giornata: senza questo filtro il sistema entrerebbe e uscirebbe
+    # in continuazione, pagando commissioni a ogni oscillazione.
+    "conferme_richieste": 3,
 }
 
 OBBLIGATORI = ("telegram_token", "telegram_chat_id")

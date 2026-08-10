@@ -32,7 +32,8 @@ CFG = load_config()
 API = f"https://api.telegram.org/bot{CFG['telegram_token']}"
 CHAT = CFG["telegram_chat_id"]
 
-pending = {}   # cid -> proposta in attesa
+pending = {}    # cid -> proposta in attesa (solo se auto_execute e' spento)
+conferme = {}   # pair -> (segnale_visto, quante volte di fila)
 
 
 def tg(method: str, **params):
@@ -137,7 +138,15 @@ def evaluate():
             want = signal_momentum(df, CFG["momentum_n"], CFG["allow_short"])
             lev, why = target_leverage(df, CFG)
             have = state["positions"].get(pair)
-            if want != (have["side"] if have else 0.0):
+            attuale = have["side"] if have else 0.0
+
+            # Filtro anti-whipsaw: conto per quanti controlli di fila il
+            # segnale resta lo stesso. Agisco solo quando si e' stabilizzato.
+            visto, n = conferme.get(pair, (None, 0))
+            n = n + 1 if visto == want else 1
+            conferme[pair] = (want, n)
+
+            if want != attuale and n >= CFG["conferme_richieste"]:
                 proposals.append({"pair": pair, "want": want, "price": px,
                                   "leverage": lev, "why": why})
         except Exception as e:
@@ -182,6 +191,17 @@ def evaluate():
 
         cid = f"{int(time.time())}_{i}"
         pending[cid] = {**p, "notional": notional, "creato": time.time()}
+
+        # --- esecuzione automatica: nessun bottone, solo notifica ---
+        if CFG.get("auto_execute", False):
+            esito = execute(cid)
+            icona = {1.0: "🟢", -1.0: "🔴", 0.0: "⚪"}[p["want"]]
+            send(f"{icona} <b>{p['pair']} — {verso} eseguito</b>\n"
+                 f"prezzo {p['price']:.4f} · leva {p['leverage']}x · "
+                 f"nozionale {notional:.2f} €\n"
+                 f"{p['why']}\n\n{esito}\n"
+                 f"<i>automatico · /pausa per fermare tutto</i>")
+            continue
 
         if p["want"] == 0.0:
             txt = (f"<b>{p['pair']}</b> — proposta: <b>CHIUDI</b>\n"
@@ -329,11 +349,14 @@ def status() -> str:
 
 # --------------------------------------------------------------------------
 def main():
+    modo = ("ESECUZIONE AUTOMATICA" if CFG.get("auto_execute")
+            else "conferma manuale")
     send("🤖 <b>Bot avviato</b> — paper trading\n"
-         f"Capitale: {CFG['capital']} € · segnali ogni {CFG['check_interval_min']} min\n"
-         f"Stop-loss automatico a {CFG['stop_loss_pct']:.0%} · "
-         f"controllo rischio ogni {CFG['risk_check_sec']}s · "
-         f"rifugio {CFG.get('safe_asset', 'EUR').upper()}\n\n"
+         f"Capitale: {CFG['capital']} € · modo: <b>{modo}</b>\n"
+         f"Controllo segnali ogni {CFG['check_interval_min']} min "
+         f"({CFG['conferme_richieste']} conferme prima di agire)\n"
+         f"Stop-loss a {CFG['stop_loss_pct']:.0%} · rischio ogni "
+         f"{CFG['risk_check_sec']}s · rifugio {CFG.get('safe_asset','EUR').upper()}\n\n"
          "/status /check /pausa /riprendi /stop /resume")
 
     offset = None
