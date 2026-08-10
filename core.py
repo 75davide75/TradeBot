@@ -31,9 +31,53 @@ MARGIN_OPEN_FEE = 0.0002
 ROLLOVER_DAILY = 0.0012
 
 
+# Valori di riserva per ogni parametro. Servono perche' config.json e' escluso
+# da git (contiene il token), quindi codice e configurazione possono
+# disallinearsi: il codice arriva aggiornato, la config resta vecchia.
+#
+# E' successo davvero, ed e' costato 37 riavvii in loop: bot.py cercava
+# 'stop_loss_pct' su un config.json copiato prima che quel campo esistesse.
+#
+# Un bot di trading non deve morire perche' manca una chiave. Deve partire
+# con un valore prudente e dirti cosa ha fatto.
+DEFAULTS = {
+    "capital": 20.0,
+    "max_leverage": 2.0,
+    "min_leverage": 0.25,
+    "target_vol": 0.20,
+    "vol_lookback": 30,
+    "momentum_n": 60,
+    "allow_short": True,
+    "universe": ["XXBTZEUR", "XETHZEUR", "XXRPZEUR"],
+    "check_interval_min": 240,
+    "max_drawdown_halt": 0.25,
+    "risk_check_sec": 60,
+    "stop_loss_pct": 0.08,
+    "auto_close_timeout_sec": 60,
+    "safe_asset": "EUR",
+    "dashboard_port": 8080,
+}
+
+OBBLIGATORI = ("telegram_token", "telegram_chat_id")
+
+
 def load_config() -> dict:
     with open(CONFIG_FILE) as f:
-        return json.load(f)
+        cfg = json.load(f)
+
+    # I segreti non hanno default: senza, il bot non ha senso di esistere.
+    mancanti = [k for k in OBBLIGATORI if not cfg.get(k) or "IL_TUO" in str(cfg[k])]
+    if mancanti:
+        raise SystemExit(f"config.json: campi obbligatori mancanti: {mancanti}")
+
+    riempiti = []
+    for k, v in DEFAULTS.items():
+        if k not in cfg:
+            cfg[k] = v
+            riempiti.append(f"{k}={v}")
+    if riempiti:
+        print(f"[config] parametri mancanti, uso i default: {', '.join(riempiti)}")
+    return cfg
 
 
 # --------------------------------------------------------------------------
