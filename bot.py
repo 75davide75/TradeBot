@@ -33,7 +33,20 @@ API = f"https://api.telegram.org/bot{CFG['telegram_token']}"
 CHAT = CFG["telegram_chat_id"]
 
 pending = {}    # cid -> proposta in attesa (solo se auto_execute e' spento)
-conferme = {}   # pair -> (segnale_visto, quante volte di fila)
+
+# Il contatore delle conferme VIVE SU DISCO, dentro state.json.
+# Tenerlo in memoria era un bug reale: ogni riavvio del servizio azzerava il
+# conteggio, e con riavvii piu' frequenti della soglia il sistema non
+# raggiungeva mai le conferme necessarie e non operava MAI.
+# Un contatore che si azzera da solo non e' un filtro, e' un blocco.
+
+
+def leggi_conferme(state) -> dict:
+    return {k: tuple(v) for k, v in state.get("conferme", {}).items()}
+
+
+def scrivi_conferme(state, c: dict) -> None:
+    state["conferme"] = {k: list(v) for k, v in c.items()}
 
 
 def tg(method: str, **params):
@@ -130,6 +143,7 @@ def evaluate():
         return
 
     prices, proposals = {}, []
+    conferme = leggi_conferme(state)
     for pair in CFG["universe"]:
         try:
             df = fetch_ohlc(pair)
@@ -173,6 +187,7 @@ def evaluate():
         return
 
     snapshot(state, eq)
+    scrivi_conferme(state, conferme)
     save_state(state)
 
     scartate = []
