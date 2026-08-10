@@ -4,7 +4,7 @@
   "telegram_token": "IL_TUO_TOKEN_DA_BOTFATHER",
   "telegram_chat_id": "IL_TUO_CHAT_ID",
 
-  "capital": 20.0,
+  "capital": 100.0,
 
   "_nota_leva": "max_leverage 2.0 non e' prudenza generica: viene dal backtest. A 3x il 44% dei conti simulati veniva liquidato, a 5x l'89%, a 10x il 100%.",
   "max_leverage": 2.0,
