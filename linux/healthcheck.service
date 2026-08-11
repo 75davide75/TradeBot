@@ -6,6 +6,11 @@ Type=oneshot
 User=%i
 WorkingDirectory=/home/%i/trading
 Environment=USER=%i
+# Senza questo, print() finisce in un buffer da 8 KB che con un servizio
+# di lunga durata non viene quasi mai scaricato: le diagnostiche non
+# arrivano MAI nel journal, e a un riavvio si perdono del tutto.
+Environment=PYTHONUNBUFFERED=1
+
 ExecStart=/usr/bin/python3 /home/%i/trading/healthcheck.py
 StandardOutput=journal
 StandardError=journal

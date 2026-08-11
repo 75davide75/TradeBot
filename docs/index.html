@@ -198,7 +198,7 @@ function render(){
   const diff=rBh==null?null:rEq-rBh;
   document.getElementById('mkt').textContent=D.mercato||'perpetui';
   document.getElementById('sub').textContent=
-    `capitale iniziale ${D.capitale} € · ${D.n_ops} operazioni chiuse · aggiornato ${new Date(D.aggiornato).toLocaleString('it-IT')}`;
+    `capitale versato ${D.capitale} € · ${D.n_ops} operazioni chiuse · aggiornato ${new Date(D.aggiornato).toLocaleString('it-IT')}`;
 
   let a='';
   if(D.halted) a+=`<div class="note">Sistema bloccato: ${D.halt_reason||''}</div>`;

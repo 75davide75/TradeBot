@@ -7,6 +7,11 @@ Wants=network-online.target
 Type=simple
 User=%i
 WorkingDirectory=/home/%i/trading
+# Senza questo, print() finisce in un buffer da 8 KB che con un servizio
+# di lunga durata non viene quasi mai scaricato: le diagnostiche non
+# arrivano MAI nel journal, e a un riavvio si perdono del tutto.
+Environment=PYTHONUNBUFFERED=1
+
 ExecStart=/usr/bin/python3 /home/%i/trading/dashboard.py
 Restart=always
 RestartSec=15

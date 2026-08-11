@@ -45,13 +45,21 @@ def costruisci() -> dict:
     # Il benchmark buy&hold riceve gli stessi versamenti negli stessi momenti,
     # altrimenti il confronto e' truccato: il nostro portafoglio avrebbe soldi
     # in piu' che il benchmark non ha mai ricevuto.
+    # I punti scritti prima che 'versato' esistesse non ce l'hanno. NON si puo'
+    # ripiegare su CFG["capital"]: dopo un versamento quello e' il totale
+    # attuale, e applicarlo all'indietro farebbe partire il benchmark dalla
+    # cifra sbagliata, come se il bot avesse perso tutto il versamento.
+    # Il capitale d'origine e' il primo punto dello storico, come in stato.py.
+    vers_origine = (float(hist[0].get("versato", hist[0].get("equity", CFG["capital"])))
+                    if hist else float(CFG["capital"]))
+
     equity, bench = [], []
     prec_btc = prec_vers = None
     valore = None
     for h in hist:
         equity.append({"x": h["ts"], "y": round(h["equity"], 4)})
         btc = h.get("btc")
-        vers = float(h.get("versato", CFG["capital"]))
+        vers = float(h.get("versato", vers_origine))
         if not btc:
             continue
         if valore is None:
