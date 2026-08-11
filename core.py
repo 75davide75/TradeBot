@@ -89,6 +89,11 @@ DEFAULTS = {
     # giornata: senza questo filtro il sistema entrerebbe e uscirebbe
     # in continuazione, pagando commissioni a ogni oscillazione.
     "conferme_richieste": 3,
+    # Filtro di negoziabilita': un mercato con spread enorme o volume
+    # evaporato non e' un'occasione, e' un modo per pagare il pedaggio
+    # due volte. Soglie misurate sui 57 perpetui Kraken (mercati.py).
+    "spread_massimo": 0.0015,
+    "volume_minimo_usd": 250000.0,
 }
 
 OBBLIGATORI = ("telegram_token", "telegram_chat_id")

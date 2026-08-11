@@ -24,6 +24,7 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 
+from mercati import scarta
 from core import (DATA_DIR, LEVA_OMBRA, StatoPerduto, adegua_capitale,
                   allinea_ombra_se_ferma,
                   apri_ombra, avvia_ombra_rispecchiando, check_kill_switch,
@@ -177,6 +178,39 @@ def risk_check():
                  f"{CFG['auto_close_timeout_sec']}s)\n{msg}")
 
 
+def universo_negoziabile(cfg):
+    """
+    Filtra l'universo tenendo solo i mercati ancora operabili.
+
+    Due protezioni deliberate, entrambe dalla stessa parte:
+
+    1. Se i dati di liquidita' non arrivano, non esclude NIENTE. Un errore di
+       rete non deve chiudere tutte le posizioni aperte.
+    2. Se il filtro scarterebbe l'universo intero, non esclude niente lo
+       stesso e lo segnala. Che tutti i mercati diventino illiquidi nello
+       stesso istante e' molto meno probabile di un guasto nei dati, e la
+       reazione sbagliata — liquidare tutto — e' irreversibile.
+
+    In dubbio, il filtro non fa niente: e' un guardiano, non un decisore.
+    """
+    universo = list(cfg["universe"])
+    try:
+        import perp
+        tickers = perp.tickers()
+    except Exception as e:
+        print(f"[filtro] dati di liquidita' non disponibili ({e}): nessuna esclusione")
+        return universo, {}
+
+    soglie = {k: cfg[k] for k in ("spread_massimo", "volume_minimo_usd") if k in cfg}
+    tenuti, fuori = scarta(universo, tickers, perp.MAPPA, soglie)
+
+    if not tenuti:
+        print("[filtro] scarterebbe TUTTO l'universo: piu' probabile un guasto "
+              "nei dati che un mercato morto. Non escludo niente.")
+        return universo, {}
+    return tenuti, fuori
+
+
 # --------------------------------------------------------------------------
 # VALUTAZIONE COMPLETA — gira ogni 4 ore
 # --------------------------------------------------------------------------
@@ -185,9 +219,21 @@ def evaluate():
     if state.get("halted") or state.get("paused"):
         return
 
+    # L'universo in configurazione e' una lista scritta a mano. Prima di
+    # usarla, controllo che i mercati siano ancora negoziabili: Kraken
+    # sospende contratti, la liquidita' evapora, gli spread si allargano.
+    # Senza questo il bot continuerebbe a operare su un mercato morto.
+    universo, esclusi = universo_negoziabile(CFG)
+    if esclusi:
+        send("⚠️ <b>Mercati esclusi dal filtro di negoziabilita'</b>\n"
+             + "\n".join(f"• {p}: {m}" for p, m in esclusi.items())
+             + "\n<i>Le posizioni aperte su questi mercati vengono chiuse.</i>")
+        for p, m in esclusi.items():
+            journal("skip_illiquido", pair=p, reason=m, confirmed=False)
+
     prices, proposals = {}, []
     conferme = leggi_conferme(state)
-    for pair in CFG["universe"]:
+    for pair in universo:
         try:
             df = fetch_ohlc(pair)
             px = float(df["close"].iloc[-1])
@@ -209,10 +255,11 @@ def evaluate():
         except Exception as e:
             print(f"[eval] {pair}: {e}")
 
-    # posizioni su coppie uscite dall'universo: vanno chiuse, altrimenti
-    # resterebbero aperte per sempre pagando rollover
+    # posizioni su coppie uscite dall'universo — per configurazione o perche'
+    # non sono piu' negoziabili: vanno chiuse, altrimenti resterebbero aperte
+    # per sempre pagando rollover
     for pair in list(state["positions"]):
-        if pair not in CFG["universe"]:
+        if pair not in universo:
             try:
                 px = fetch_price(pair)
                 prices[pair] = px
