@@ -11,19 +11,20 @@ Filosofia di design, in ordine di importanza:
      se gli aggiustamenti aiutano o fanno danni.
 """
 
-import csv
 import json
-import os
 import urllib.request
 from datetime import datetime, timezone
 
 import numpy as np
 import pandas as pd
 
-BASE = os.path.dirname(os.path.abspath(__file__))
-STATE_FILE = os.path.join(BASE, "state.json")
-JOURNAL_FILE = os.path.join(BASE, "journal.csv")
-CONFIG_FILE = os.path.join(BASE, "config.json")
+# La persistenza sta in stato.py, che non importa pandas ne' numpy: e' il
+# codice piu' critico del sistema e deve poter girare e essere testato anche
+# dove le librerie scientifiche non ci sono. Qui viene riesposta, cosi'
+# 'from core import STATE_FILE' continua a funzionare ovunque.
+from stato import (BASE, CONFIG_FILE, DATA_DIR, JOURNAL_FILE,  # noqa: F401
+                   REPORT_DIR, STATE_FILE, StatoPerduto, blank_state,
+                   journal, load_state, migra_se_serve, save_state)
 
 # Costi Kraken reali, fascia volume piu' bassa
 TAKER_FEE = 0.0040
@@ -219,52 +220,11 @@ def target_leverage(df: pd.DataFrame, cfg: dict) -> tuple[float, str]:
 
 # --------------------------------------------------------------------------
 # PORTAFOGLIO PAPER
+#
+# blank_state, load_state, save_state e journal vivono in stato.py: sono
+# importati in cima a questo file e riesposti. Qui restano solo le funzioni
+# che fanno conti, che e' il mestiere di core.py.
 # --------------------------------------------------------------------------
-def blank_state(cfg: dict) -> dict:
-    return {
-        "mode": "paper",
-        "cash": cfg["capital"],
-        "positions": {},
-        "peak_equity": cfg["capital"],
-        "halted": False,
-        "halt_reason": "",
-        "shadow_cash": cfg["capital"],      # portafoglio ombra: leva fissa 1x
-        "shadow_positions": {},
-        "created": datetime.now(timezone.utc).isoformat(),
-        "history": [],
-    }
-
-
-def load_state(cfg: dict) -> dict:
-    if not os.path.exists(STATE_FILE):
-        s = blank_state(cfg)
-        save_state(s)
-        return s
-    with open(STATE_FILE) as f:
-        return json.load(f)
-
-
-def save_state(state: dict) -> None:
-    tmp = STATE_FILE + ".tmp"
-    with open(tmp, "w") as f:
-        json.dump(state, f, indent=2)
-    os.replace(tmp, STATE_FILE)   # scrittura atomica: niente stato corrotto
-
-
-def journal(action: str, **fields) -> None:
-    """Ogni decisione viene scritta qui. Il journal e' la fonte di verita'."""
-    row = {"ts": datetime.now(timezone.utc).isoformat(), "action": action}
-    row.update(fields)
-    exists = os.path.exists(JOURNAL_FILE)
-    cols = ["ts", "action", "pair", "side", "price", "notional",
-            "leverage", "equity", "reason", "confirmed"]
-    with open(JOURNAL_FILE, "a", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=cols, extrasaction="ignore")
-        if not exists:
-            w.writeheader()
-        w.writerow(row)
-
-
 def carry_giornaliero(pair: str, side: float) -> float:
     """
     Costo (o ricavo) di tenere aperta una posizione, per giorno, come frazione
