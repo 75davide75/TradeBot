@@ -1,5 +1,13 @@
 # Sistema di trading — paper trading con conferma manuale
 
+### 📊 [**Dashboard in diretta**](https://75davide75.github.io/TradeBot/) · 📄 [**Report tecnico**](https://75davide75.github.io/TradeBot/ricerca.html)
+
+La dashboard mostra portafoglio, posizioni aperte e grafici a candela in tempo
+reale. Il report tecnico raccoglie le evidenze pubblicate su day trading e IA
+nei mercati, confrontate con quanto misurato da questo sistema.
+
+---
+
 Bot Telegram che propone operazioni, tu confermi con un tap, il sistema esegue
 **in simulazione**. Nessuna credenziale Kraken, nessun soldo reale.
 
@@ -32,8 +40,9 @@ pip3 install pandas numpy
 
 ### 5. Prova che funzioni
 
+Dalla cartella del progetto:
+
 ```bash
-cd "/Users/davidesogos/Desktop/progetto trading"
 python3 bot.py
 ```
 
@@ -43,31 +52,32 @@ Ferma con `Ctrl+C`.
 
 ### 6. Fallo partire da solo
 
+Il sistema è pensato per girare su una macchina sempre accesa — un Raspberry
+Pi va benissimo. Istruzioni complete in **[`linux/INSTALLA.md`](linux/INSTALLA.md)**:
+servizi systemd per il bot, la pubblicazione della dashboard ogni 30 minuti e
+il controllo di salute del mattino.
+
+Un portatile non è adatto: chiudere il coperchio lo addormenta, e i buchi nel
+controllo diventano buchi nello storico.
+
+## Frequenza dei controlli
+
+Due orologi distinti, ed è deliberato:
+
+- **stop-loss ogni 60 secondi** — il rischio va tolto in fretta
+- **segnale ogni 15 minuti**, ma calcolato sull'ultima candela **giornaliera
+  chiusa** — le decisioni vanno prese al ritmo dell'informazione che le genera
+
+Il segnale è il momentum a 60 giorni: cambia in media una volta ogni 18 giorni
+per mercato. Controllarlo più spesso non trova occasioni prima, e usare la
+candela ancora aperta genera 1,8 falsi cambi per ogni cambio vero — misurato.
+
+## Verifiche
+
 ```bash
-cp com.davide.tradingbot.plist ~/Library/LaunchAgents/
-cp com.davide.dailyreview.plist ~/Library/LaunchAgents/
-launchctl load ~/Library/LaunchAgents/com.davide.tradingbot.plist
-launchctl load ~/Library/LaunchAgents/com.davide.dailyreview.plist
+python3 -m unittest test_stato -v      # persistenza, versamenti, ombra
+python3 -m unittest test_segnale -v    # segnale (richiede pandas, sennò si salta)
 ```
-
-Da qui in poi il bot parte da solo all'accensione del Mac e si riavvia se
-crasha. `caffeinate -i` nel plist impedisce lo sleep da inattività.
-
-Per fermarlo: `launchctl unload ~/Library/LaunchAgents/com.davide.tradingbot.plist`
-
-## Sul Mac in standby
-
-`caffeinate -i` impedisce lo sleep da inattività, ma **chiudere il coperchio
-del MacBook lo addormenta comunque**. Se ti serve continuità:
-
-- lascia il coperchio aperto, oppure
-- clamshell: alimentazione + monitor esterno collegati, oppure
-- accetta i buchi
-
-L'ultima opzione è quella giusta. Il sistema lavora su candele daily e
-controlla ogni 4 ore: saltare un controllo non rompe niente, il segnale viene
-ricalcolato al risveglio. Se ti servisse una macchina sempre viva vorrebbe
-dire che stai usando un timeframe sbagliato per questo capitale.
 
 ## Comandi Telegram
 
@@ -94,12 +104,21 @@ Non a naso. Vengono dal backtest in `RISULTATI.md`:
 - **Nessuna credenziale Kraken** — il bot legge solo dati pubblici. Non può
   muovere soldi neanche se avesse un bug.
 
+- **Portafoglio ombra** — gira in parallelo con leva fissa 1x, rispecchiando
+  ogni decisione. Serve a rispondere a "il volatility targeting aiuta o fa
+  danni?", che con un solo portafoglio resterebbe un'opinione.
+
 ## Cosa aspettarsi
 
-Il backtest non ha trovato edge in nessuna delle strategie testate, a nessun
-livello di leva. Questo sistema non è un generatore di profitti: è uno
-strumento di misura. Serve a osservare come si comporta una strategia con
-costi reali, e a produrre dati onesti su cui decidere.
+Nessuna delle strategie testate ha mostrato un vantaggio che sopravviva ai
+costi reali: né le quattro classiche sullo spot (`RISULTATI.md`), né le sei
+provate sui perpetui con spread e commissioni veri (`RICERCA_AGOSTO_2026.md`).
+Il candidato migliore aveva Sharpe 3,75 e si è rivelato dieci giorni di
+funding anomalo su un mercato illiquido.
+
+Questo sistema non è un generatore di profitti: è uno **strumento di misura**.
+Serve a osservare come si comporta una strategia con costi reali, e a produrre
+dati onesti su cui decidere.
 
 Se dopo qualche settimana di paper il conto simulato è sotto, quella è
 l'informazione, ed è costata zero.
@@ -108,11 +127,29 @@ l'informazione, ed è costata zero.
 
 | File | Cosa fa |
 |---|---|
-| `core.py` | Dati, segnale, layer di rischio, portafoglio |
+| `stato.py` | Persistenza: dove vivono i dati, blocco all'avvio, versamenti |
+| `core.py` | Dati, segnale, layer di rischio, portafoglio, ombra |
 | `bot.py` | Bot Telegram, processo sempre attivo |
-| `daily_review.py` | Report giornaliero delle 9:00 |
-| `backtest.py` / `run_backtest.py` | Motore di backtest |
-| `RISULTATI.md` | Risultati e metodo del backtest |
-| `state.json` | Stato del portafoglio (generato) |
-| `journal.csv` | Log di ogni decisione (generato) |
-| `report/` | Report giornalieri in JSON (generato) |
+| `perp.py` | Adattatore per i futures perpetui Kraken |
+| `publish.py` | Genera e pubblica `docs/data.json` per la dashboard |
+| `healthcheck.py` | Controllo di salute delle 9:00 |
+| `daily_review.py` | Report giornaliero |
+| `backtest.py` / `run_backtest.py` | Motore di backtest sullo spot |
+| `perp_test/ricerca.py` | Ricerca sui segnali, con costi e spread reali |
+| `docs/` | Dashboard e report tecnico pubblicati su GitHub Pages |
+| `linux/` | Servizi systemd e istruzioni d'installazione |
+
+### Dove vivono i dati
+
+`state.json`, `journal.csv` e `report/` **non** stanno nella cartella del
+codice: stanno in `~/trading-dati/`. La cartella del codice è sacrificabile,
+lo storico no. Il motivo è in `linux/INSTALLA.md`.
+
+## Documenti
+
+| Documento | Contenuto |
+|---|---|
+| `RISULTATI.md` | Backtest sullo spot a margine: nessun edge, a nessuna leva |
+| `TEST_PERPETUI.md` | 57 mercati perpetui con funding reale |
+| `RICERCA_AGOSTO_2026.md` | Sei segnali con costi veri: nessuno supera le prove |
+| `specs/` | Progetto e piano della persistenza dello stato |
