@@ -28,8 +28,12 @@ button{font:inherit;font-size:13px;font-weight:500;color:var(--txt);cursor:point
        padding:8px 14px;display:flex;align-items:center;gap:7px;transition:.15s}
 button:hover{background:#22262e;border-color:#3a3f4a}
 button.on{background:rgba(38,166,154,.14);border-color:rgba(38,166,154,.5);color:#4dd0c4}
+button.attesa{background:rgba(227,179,65,.12);border-color:rgba(227,179,65,.45);color:#d9b45a}
+button.ko{background:rgba(239,83,80,.12);border-color:rgba(239,83,80,.45);color:#f08a88}
 .dot{width:7px;height:7px;border-radius:50%;background:var(--faint)}
 button.on .dot{background:var(--up);animation:puls 1.6s ease-in-out infinite}
+button.attesa .dot{background:var(--warn);animation:puls .9s ease-in-out infinite}
+button.ko .dot{background:var(--down)}
 @keyframes puls{0%,100%{opacity:1}50%{opacity:.25}}
 
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(178px,1fr));gap:12px;margin-bottom:24px}
@@ -48,6 +52,7 @@ h2{font-size:14px;font-weight:600;color:var(--dim);letter-spacing:.03em;
 .card{background:var(--surf);border:1px solid var(--line);border-radius:12px;overflow:hidden}
 .eqbox{padding:16px 18px 10px}
 #eq{height:300px}
+#proj{height:250px}
 
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(348px,1fr));gap:13px}
 .pos{background:var(--surf);border:1px solid var(--line);border-radius:12px;overflow:hidden}
@@ -62,8 +67,13 @@ h2{font-size:14px;font-weight:600;color:var(--dim);letter-spacing:.03em;
 .pnl .p{font-size:17px;font-weight:600;letter-spacing:-.01em}
 .pnl .q{font-size:11.5px;color:var(--faint);margin-top:2px}
 .chart{height:172px}
-.foot{display:flex;justify-content:space-between;padding:10px 16px;
+.foot{display:flex;justify-content:space-between;gap:10px;padding:10px 16px;
       border-top:1px solid var(--line);font-size:11.5px;color:var(--faint)}
+.fonte{opacity:.62;font-size:10.5px;letter-spacing:.02em;align-self:center}
+.pos.vivo{border-color:rgba(38,166,154,.32)}
+.pos.vivo .pnl .q::after{content:'';display:inline-block;width:5px;height:5px;
+  margin-left:6px;border-radius:50%;background:var(--up);
+  animation:puls 1.6s ease-in-out infinite;vertical-align:middle}
 
 table{width:100%;border-collapse:collapse;font-size:13px}
 th{text-align:left;padding:11px 15px;color:var(--faint);font-weight:500;font-size:11.5px;
@@ -119,13 +129,39 @@ a{color:#6b9fe8;text-decoration:none}a:hover{text-decoration:underline}
 </div>
 
 <script>
-const PERP={XXBTZEUR:'PF_XBTUSD',XETHZEUR:'PF_ETHUSD',XXRPZEUR:'PF_XRPUSD',SOLEUR:'PF_SOLUSD',
- LINKEUR:'PF_LINKUSD',XLTCZEUR:'PF_LTCUSD',ADAEUR:'PF_ADAUSD',DOTEUR:'PF_DOTUSD',
- AVAXEUR:'PF_AVAXUSD',BCHEUR:'PF_BCHUSD',XXMRZEUR:'PF_XMRUSD',ATOMEUR:'PF_ATOMUSD',
- FILEUR:'PF_FILUSD',UNIEUR:'PF_UNIUSD'};
-const nome=p=>(PERP[p]||p).replace('PF_','').replace('USD','').replace('XBT','BTC');
+/* Ogni mercato ha tre nomi diversi, e servono tutti e tre:
+     perp   il contratto su cui il bot opera davvero (prezzi in USD)
+     spot   la coppia spot Kraken in USD: e' l'unica fonte di candele storiche
+            che il browser riesce a leggere, perche' futures.kraken.com risponde
+            senza un Access-Control-Allow-Origin valido e il browser blocca tutto.
+            Lo spot USD sta a meno di uno 0,1% dal mark price del perpetuo, quindi
+            le candele restano sulla stessa scala dei prezzi d'ingresso.
+     bybit  perpetuo di riserva, se Kraken non risponde
+   Il tempo reale invece arriva dal WebSocket di Kraken Futures: sui WebSocket
+   il CORS non si applica, quindi da li' il mark price esatto lo otteniamo. */
+const MKT={
+ XXBTZEUR:{perp:'PF_XBTUSD', spot:'XBTUSD', bybit:'BTCUSDT', nome:'BTC'},
+ XETHZEUR:{perp:'PF_ETHUSD', spot:'ETHUSD', bybit:'ETHUSDT', nome:'ETH'},
+ XXRPZEUR:{perp:'PF_XRPUSD', spot:'XRPUSD', bybit:'XRPUSDT', nome:'XRP'},
+ SOLEUR:  {perp:'PF_SOLUSD', spot:'SOLUSD', bybit:'SOLUSDT', nome:'SOL'},
+ LINKEUR: {perp:'PF_LINKUSD',spot:'LINKUSD',bybit:'LINKUSDT',nome:'LINK'},
+ XLTCZEUR:{perp:'PF_LTCUSD', spot:'LTCUSD', bybit:'LTCUSDT', nome:'LTC'},
+ ADAEUR:  {perp:'PF_ADAUSD', spot:'ADAUSD', bybit:'ADAUSDT', nome:'ADA'},
+ DOTEUR:  {perp:'PF_DOTUSD', spot:'DOTUSD', bybit:'DOTUSDT', nome:'DOT'},
+ AVAXEUR: {perp:'PF_AVAXUSD',spot:'AVAXUSD',bybit:'AVAXUSDT',nome:'AVAX'},
+ BCHEUR:  {perp:'PF_BCHUSD', spot:'BCHUSD', bybit:'BCHUSDT', nome:'BCH'},
+ XXMRZEUR:{perp:'PF_XMRUSD', spot:'XMRUSD', bybit:'XMRUSDT', nome:'XMR'},
+ ATOMEUR: {perp:'PF_ATOMUSD',spot:'ATOMUSD',bybit:'ATOMUSDT',nome:'ATOM'},
+ FILEUR:  {perp:'PF_FILUSD', spot:'FILUSD', bybit:'FILUSDT', nome:'FIL'},
+ UNIEUR:  {perp:'PF_UNIUSD', spot:'UNIUSD', bybit:'UNIUSDT', nome:'UNI'}};
+const PERP=Object.fromEntries(Object.entries(MKT).map(([k,m])=>[k,m.perp]));
+const DA_PERP=Object.fromEntries(Object.entries(MKT).map(([k,m])=>[m.perp,k]));
+const nome=p=>MKT[p]?MKT[p].nome
+  :String(p).replace('PF_','').replace(/USDT?$/,'').replace('XBT','BTC');
 const eur=n=>n==null?'—':n.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
 const pct=n=>n==null?'—':(n>=0?'+':'')+(n*100).toFixed(2)+'%';
+// Quattro decimali su BTC sono rumore, due su ADA cancellano il prezzo.
+const cifre=n=>(+n).toFixed(n<1?6:n<100?4:2);
 const cls=n=>n==null?'':(n>=0?'up':'down');
 const opt={layout:{background:{color:'transparent'},textColor:'#8b9099',fontFamily:'JetBrains Mono',fontSize:11},
   grid:{vertLines:{color:'rgba(35,38,45,.5)'},horzLines:{color:'rgba(35,38,45,.5)'}},
@@ -133,14 +169,23 @@ const opt={layout:{background:{color:'transparent'},textColor:'#8b9099',fontFami
   crosshair:{mode:1,vertLine:{color:'#3a3f4a',labelBackgroundColor:'#1a1d23'},
              horzLine:{color:'#3a3f4a',labelBackgroundColor:'#1a1d23'}}};
 
-let D=null, live=false, timer=null, prezzi={}, serie={};
+const ORA=3600;              // le candele sono orarie
+const GIORNI=3;              // quanto storico mostrare in ogni riquadro
+let D=null, live=false, ws=null, riconnetti=null, tentativi=0;
+let prezzi={}, serie={}, grafici=[];
+
+// I grafici vanno distrutti a mano: senza remove() ogni ricarica ne lascia
+// uno vecchio attaccato al DOM, con il suo ResizeObserver ancora vivo.
+function pulisci(){ grafici.forEach(c=>{try{c.remove()}catch(e){}}); grafici=[]; }
+function crea(el,extra){ const c=LightweightCharts.createChart(el,{...opt,autoSize:true,...extra});
+  grafici.push(c); return c; }
 
 async function carica(){
   D=await (await fetch('data.json?t='+Date.now())).json();
+  pulisci();
   render();
   proiezione();
   await candele();
-  aggiorna();
 }
 
 function render(){
@@ -171,7 +216,7 @@ function render(){
      <div class="d">${D.n_ops} chiuse finora</div></div>`;
 
   const eqEl=document.getElementById('eq'); eqEl.innerHTML='';
-  const ch=LightweightCharts.createChart(eqEl,{...opt,height:300});
+  const ch=crea(eqEl);
   const s1=ch.addAreaSeries({lineColor:'#3b82f6',topColor:'rgba(59,130,246,.22)',
     bottomColor:'rgba(59,130,246,0)',lineWidth:2,priceLineVisible:false});
   const s2=ch.addLineSeries({color:'#eb6834',lineWidth:2,lineStyle:2,priceLineVisible:false});
@@ -180,7 +225,6 @@ function render(){
   if(D.equity.length) s1.setData(conv(D.equity));
   if(D.benchmark.length) s2.setData(conv(D.benchmark));
   ch.timeScale().fitContent();
-  new ResizeObserver(()=>ch.applyOptions({width:eqEl.clientWidth})).observe(eqEl);
 
   document.getElementById('ops').innerHTML=D.ops.map(o=>`<tr>
     <td class="mono">${new Date(o.ts).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</td>
@@ -192,7 +236,8 @@ function render(){
     ||'<tr><td colspan="7" class="skel">nessuna operazione ancora</td></tr>';
 
   document.getElementById('ft').innerHTML=
-   `Paper trading — nessun capitale reale impiegato. Prezzi e candele arrivano in diretta da Kraken Futures; lo stato del portafoglio dal Raspberry Pi, aggiornato ogni 30 minuti.<br>
+   `Paper trading — nessun capitale reale impiegato. Lo stato del portafoglio arriva dal Raspberry Pi, aggiornato ogni 30 minuti.<br>
+    Candele orarie da Kraken spot USD (di riserva Bybit); col tasto <b>Avvia live</b> i prezzi passano al mark price dei perpetui Kraken Futures via WebSocket, quello stesso su cui il bot calcola le posizioni.<br>
     <a href="https://github.com/75davide75/TradeBot">github.com/75davide75/TradeBot</a>`;
 }
 
@@ -209,27 +254,26 @@ function proiezione(){
     if(dt>0&&H[i-1].y>0) r.push({t:H[i].x,g:(H[i].y/H[i-1].y-1)/dt});
   }
   if(!r.length){nota.textContent='Dati insufficienti.';return}
-  const serie=[],alto=[],basso=[];
+  const stima=[],alto=[],basso=[];
   let s=0,s2=0;
   r.forEach((x,i)=>{
     s+=x.g; s2+=x.g*x.g;
     const n=i+1, m=s/n, sd=n>1?Math.sqrt(Math.max(0,(s2-n*m*m)/(n-1))):0;
     const ann=m*365, err=n>1?sd/Math.sqrt(n)*365:0;
     const time=Math.floor(new Date(x.t).getTime()/1000);
-    serie.push({time,value:ann*100});
+    stima.push({time,value:ann*100});
     alto.push({time,value:(ann+1.96*err)*100});
     basso.push({time,value:(ann-1.96*err)*100});
   });
   const uniq=a=>a.filter((v,i,z)=>i===0||v.time>z[i-1].time);
-  const ch=LightweightCharts.createChart(el,{...opt,height:250});
+  const ch=crea(el);
   const b=ch.addLineSeries({color:'rgba(139,144,153,.45)',lineWidth:1,lineStyle:2,priceLineVisible:false});
   const a=ch.addLineSeries({color:'rgba(139,144,153,.45)',lineWidth:1,lineStyle:2,priceLineVisible:false});
   const c=ch.addLineSeries({color:'#3b82f6',lineWidth:2,priceLineVisible:false});
-  b.setData(uniq(basso)); a.setData(uniq(alto)); c.setData(uniq(serie));
+  b.setData(uniq(basso)); a.setData(uniq(alto)); c.setData(uniq(stima));
   ch.timeScale().fitContent();
-  new ResizeObserver(()=>ch.applyOptions({width:el.clientWidth})).observe(el);
 
-  const u=serie[serie.length-1].value, lo=basso[basso.length-1].value, hi=alto[alto.length-1].value;
+  const u=stima[stima.length-1].value, lo=basso[basso.length-1].value, hi=alto[alto.length-1].value;
   const gg=r.length;
   nota.innerHTML=`Stima corrente <b class="${u>=0?'up':'down'}">${u>=0?'+':''}${u.toFixed(1)}% annuo</b>
     — intervallo di confidenza al 95%: da ${lo.toFixed(1)}% a ${hi.toFixed(1)}%.
@@ -246,8 +290,7 @@ async function candele(){
 
   // Quando non c'e' nulla di aperto mostro comunque i grafici dell'universo:
   // una pagina vuota non dice se il sistema sta lavorando o e' fermo.
-  const lista=aperte?Object.entries(P)
-    :(D.universo||[]).map(p=>[p,null]);
+  const lista=mercatiMostrati();
   if(!lista.length){box.innerHTML='<div class="skel">nessun mercato configurato</div>';return}
 
   box.innerHTML=lista.map(([p,v])=>`
@@ -255,69 +298,191 @@ async function candele(){
       <header><div><div class="sym">${nome(p)}
         ${v?`<span class="side ${v.side>0?'long':'short'}">${v.side>0?'LONG':'SHORT'}</span>`
            :'<span class="side" style="background:rgba(139,144,153,.14);color:#8b9099">IN ATTESA</span>'}</div>
-        <div class="meta mono">${v?`ingresso ${(+v.entry).toFixed(4)} · leva ${(+v.leverage).toFixed(2)}x`
+        <div class="meta mono">${v?`ingresso ${cifre(+v.entry)} · leva ${(+v.leverage).toFixed(2)}x`
                                   :'nessuna posizione'}</div></div>
         <div class="pnl"><div class="p mono" data-pnl>—</div><div class="q mono" data-px>—</div></div>
       </header>
       <div class="chart" data-chart></div>
       <div class="foot"><span>${v?`nozionale ${(+v.notional).toFixed(2)} €`:'in osservazione'}</span>
+        <span data-fonte class="fonte"></span>
         <span>${v?`stop a ${(-8/(+v.leverage||1)).toFixed(1)}%`:''}</span></div>
     </div>`).join('');
 
-  const da=Math.floor(Date.now()/1000)-3*86400;
-  for(const [p,v] of lista){
+  // Le candele storiche le prende lo spot USD di Kraken. Il perpetuo sarebbe la
+  // fonte esatta, ma futures.kraken.com non manda un Access-Control-Allow-Origin
+  // valido e dal browser la chiamata non parte proprio.
+  const guai=[];
+  await inParallelo(lista,3,async ([p,v])=>{
     const el=document.querySelector(`.pos[data-p="${p}"] [data-chart]`);
+    if(!el) return;
     try{
-      const r=await fetch(`https://futures.kraken.com/api/charts/v1/trade/${PERP[p]||p}/1h?from=${da}`);
-      const c=(await r.json()).candles||[];
-      const ch=LightweightCharts.createChart(el,{...opt,height:172,
-        timeScale:{...opt.timeScale,timeVisible:true}});
+      const {dati,fonte}=await storico(p);
+      if(!dati.length) throw new Error('nessuna candela restituita');
+      const ch=crea(el,{timeScale:{...opt.timeScale,timeVisible:true,secondsVisible:false}});
       const s=ch.addCandlestickSeries({upColor:'#26a69a',downColor:'#ef5350',
         borderUpColor:'#26a69a',borderDownColor:'#ef5350',
         wickUpColor:'#26a69a',wickDownColor:'#ef5350'});
-      s.setData(c.map(k=>({time:Math.floor(k.time/1000),open:+k.open,high:+k.high,low:+k.low,close:+k.close})));
+      s.setData(dati);
       if(v) s.createPriceLine({price:+v.entry,color:'#8b9099',lineWidth:1,lineStyle:2,
         axisLabelVisible:true,title:'ingresso'});
       ch.timeScale().fitContent();
-      serie[p]={ch,s,ultima:c.length?c[c.length-1]:null};
-      new ResizeObserver(()=>ch.applyOptions({width:el.clientWidth})).observe(el);
-    }catch(e){el.innerHTML='<div class="skel">grafico non disponibile</div>'}
+      // Copia dell'ultima candela: da qui in poi la aggiorna il flusso live.
+      serie[p]={ch,s,fonte,ultima:{...dati[dati.length-1]}};
+      const f=el.parentElement.querySelector('[data-fonte]');
+      if(f) f.textContent=fonte;
+      // Cosi' il P&L e' gia' pieno all'apertura, senza aspettare il tasto live.
+      mostra(p,v,dati[dati.length-1].close,false);
+    }catch(e){
+      el.innerHTML=`<div class="skel">grafico non disponibile — ${e.message}</div>`;
+      guai.push(nome(p));
+    }
+  });
+  if(guai.length) avviso(`Candele non caricate per ${guai.join(', ')}. Il resto della pagina resta valido.`);
+}
+
+// Poche richieste alla volta: Kraken limita le chiamate pubbliche, e otto
+// fetch tutte insieme si prendono un rifiuto per eccesso di traffico.
+async function inParallelo(elenco,quante,f){
+  const coda=[...elenco];
+  await Promise.all(Array.from({length:Math.min(quante,coda.length)},async()=>{
+    while(coda.length) await f(coda.shift());
+  }));
+}
+
+async function storico(p){
+  const m=MKT[p];
+  if(!m) throw new Error('mercato sconosciuto');
+  try{ return {dati:await daKraken(m), fonte:'Kraken spot'}; }
+  catch(e1){
+    try{ return {dati:await daBybit(m), fonte:'Bybit perp'}; }
+    catch(e2){ throw new Error(`${e1.message}; anche il ripiego Bybit ha fallito (${e2.message})`); }
   }
 }
 
-async function aggiorna(){
-  try{
-    const t=await (await fetch('https://futures.kraken.com/derivatives/api/v3/tickers')).json();
-    const m={}; t.tickers.forEach(x=>m[x.symbol.toUpperCase()]=x);
-    const P=D.posizioni||{};
-    const tutti=Object.keys(P).length?Object.keys(P):(D.universo||[]);
-    for(const p of tutti){
-      const v=P[p];
-      const k=m[(PERP[p]||p).toUpperCase()]; if(!k) continue;
-      const px=+(k.markPrice||k.last); prezzi[p]=px;
-      const card=document.querySelector(`.pos[data-p="${p}"]`); if(!card) continue;
-      const e=card.querySelector('[data-pnl]');
-      if(v){
-        const mv=(px-v.entry)/v.entry*v.side, pl=v.notional*mv;
-        e.textContent=(pl>=0?'+':'')+pl.toFixed(2)+' €';
-        e.className='p mono '+(pl>=0?'up':'down');
-        card.querySelector('[data-px]').textContent=px.toFixed(4)+'  ('+pct(mv)+')';
-      }else{
-        e.textContent=px.toFixed(4); e.className='p mono';
-        card.querySelector('[data-px]').textContent='prezzo di mercato';
-      }
-      const S=serie[p];
-      if(S&&S.ultima){const u=S.ultima;
-        S.s.update({time:Math.floor(u.time/1000),open:+u.open,
-          high:Math.max(+u.high,px),low:Math.min(+u.low,px),close:px});}
-    }
-  }catch(e){}
+async function daKraken(m){
+  // 'since' evita di scaricare i 30 giorni pieni per mostrarne tre.
+  const da=Math.floor(Date.now()/1000)-GIORNI*86400;
+  const r=await fetch(`https://api.kraken.com/0/public/OHLC?pair=${m.spot}&interval=60&since=${da}`);
+  if(!r.ok) throw new Error('Kraken HTTP '+r.status);
+  const j=await r.json();
+  if(j.error&&j.error.length) throw new Error('Kraken '+j.error.join(' '));
+  // La chiave del risultato non e' quella richiesta (XBTUSD torna XXBTZUSD).
+  const k=Object.keys(j.result||{}).find(x=>x!=='last');
+  if(!k) throw new Error('Kraken: risposta senza dati');
+  return taglia(j.result[k].map(c=>
+    ({time:+c[0],open:+c[1],high:+c[2],low:+c[3],close:+c[4]})));
+}
+
+async function daBybit(m){
+  const r=await fetch(`https://api.bybit.com/v5/market/kline?category=linear&symbol=${m.bybit}&interval=60&limit=200`);
+  if(!r.ok) throw new Error('Bybit HTTP '+r.status);
+  const j=await r.json();
+  if(j.retCode!==0) throw new Error('Bybit '+(j.retMsg||j.retCode));
+  // Bybit le manda dalla piu' recente: vanno rovesciate.
+  return taglia((j.result?.list||[]).map(c=>
+    ({time:Math.floor(+c[0]/1000),open:+c[1],high:+c[2],low:+c[3],close:+c[4]})).reverse());
+}
+
+// Tiene solo la finestra che mostriamo, in ordine e senza tempi ripetuti:
+// lightweight-charts rifiuta i dati non crescenti.
+function taglia(c){
+  const da=Math.floor(Date.now()/1000)-GIORNI*86400;
+  return c.filter(k=>Number.isFinite(k.close)&&k.time>=da)
+          .sort((a,b)=>a.time-b.time)
+          .filter((k,i,z)=>i===0||k.time>z[i-1].time);
+}
+
+function avviso(t){
+  const el=document.getElementById('alert');
+  el.innerHTML+=`<div class="note">${t}</div>`;
+}
+
+// Scrive prezzo e P&L di un mercato. 'vivo' distingue il dato in streaming
+// dall'ultima chiusura nota, perche' non valgono la stessa cosa.
+function mostra(p,v,px,vivo){
+  prezzi[p]=px;
+  const card=document.querySelector(`.pos[data-p="${p}"]`); if(!card) return;
+  const e=card.querySelector('[data-pnl]'), q=card.querySelector('[data-px]');
+  if(v){
+    const mv=(px-v.entry)/v.entry*v.side, pl=v.notional*mv;
+    e.textContent=(pl>=0?'+':'')+pl.toFixed(2)+' €';
+    e.className='p mono '+(pl>=0?'up':'down');
+    q.textContent=`${cifre(px)} (${pct(mv)})`;
+  }else{
+    e.textContent=cifre(px); e.className='p mono';
+    q.textContent=vivo?'prezzo in diretta':'ultima chiusura';
+  }
+  card.classList.toggle('vivo',!!vivo);
+}
+
+/* ---- tempo reale: WebSocket di Kraken Futures ----
+   Sui WebSocket il CORS non si applica, quindi questa e' l'unica strada per
+   avere il mark price vero dei perpetui dentro una pagina su github.io.
+   In piu' e' un flusso push: la versione precedente interrogava l'API REST
+   una volta al secondo, che e' traffico sprecato e rischia il blocco. */
+function stato(classe,testo){
+  const b=document.getElementById('live');
+  b.classList.remove('on','attesa','ko');
+  if(classe) b.classList.add(classe);
+  document.getElementById('livetxt').textContent=testo;
+}
+
+function apriLive(){
+  const prodotti=[...new Set(mercatiMostrati().map(([p])=>MKT[p]?.perp).filter(Boolean))];
+  if(!prodotti.length){stato('ko','Nessun mercato');return}
+  stato('attesa','Connessione…');
+  try{ ws=new WebSocket('wss://futures.kraken.com/ws/v1'); }
+  catch(e){ stato('ko','Live non disponibile'); return; }
+
+  ws.onopen=()=>{ tentativi=0; stato('on','Live attivo');
+    ws.send(JSON.stringify({event:'subscribe',feed:'ticker',product_ids:prodotti})); };
+
+  ws.onmessage=ev=>{
+    let d; try{ d=JSON.parse(ev.data) }catch(e){ return }
+    if(d.event==='error'||d.event==='alert'){ stato('ko',d.message||'Errore del flusso'); return }
+    if(d.feed!=='ticker'||!d.product_id) return;
+    const px=+(d.markPrice ?? d.last);
+    if(!Number.isFinite(px)) return;
+    const p=DA_PERP[d.product_id]; if(!p) return;
+    mostra(p,(D.posizioni||{})[p],px,true);
+    disegnaTick(p,px);
+  };
+
+  ws.onclose=()=>{ ws=null; if(!live) return;
+    // Rientro con attesa crescente, per non martellare l'exchange se e' giu'.
+    const attesa=Math.min(30000,1000*2**tentativi++);
+    stato('attesa',`Riconnessione tra ${Math.round(attesa/1000)} s…`);
+    riconnetti=setTimeout(apriLive,attesa); };
+
+  ws.onerror=()=>{ if(live) stato('attesa','Problema di rete…'); };
+}
+
+function chiudiLive(){
+  clearTimeout(riconnetti); riconnetti=null; tentativi=0;
+  if(ws){ const s=ws; ws=null; s.onclose=null; try{s.close()}catch(e){} }
+}
+
+// Aggiunge il tick alla candela in corso, e ne apre una nuova quando scatta
+// l'ora. Prima mancava questo passaggio: dopo il cambio d'ora il flusso
+// continuava a riscrivere la stessa candela, che si allungava all'infinito.
+function disegnaTick(p,px){
+  const S=serie[p]; if(!S) return;
+  const secchio=Math.floor(Date.now()/1000/ORA)*ORA;
+  let u=S.ultima;
+  if(!u||secchio>u.time) u=S.ultima={time:secchio,open:px,high:px,low:px,close:px};
+  else{ u.high=Math.max(u.high,px); u.low=Math.min(u.low,px); u.close=px; }
+  try{ S.s.update({...u}) }catch(e){}
+}
+
+function mercatiMostrati(){
+  const P=D&&D.posizioni||{};
+  return Object.keys(P).length?Object.entries(P):((D&&D.universo)||[]).map(p=>[p,null]);
 }
 
 document.getElementById('live').onclick=function(){
-  live=!live; this.classList.toggle('on',live);
-  document.getElementById('livetxt').textContent=live?'Live attivo':'Avvia live';
-  if(live){aggiorna();timer=setInterval(aggiorna,1000)}else clearInterval(timer);
+  live=!live;
+  if(live) apriLive();
+  else{ chiudiLive(); stato(null,'Avvia live'); }
 };
 document.getElementById('rel').onclick=()=>location.reload();
 carica().catch(()=>{document.getElementById('sub').textContent=
