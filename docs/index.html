@@ -88,6 +88,7 @@ tr:hover td{background:rgba(255,255,255,.016)}
 .pill{font-size:10.5px;font-weight:600;padding:2.5px 8px;border-radius:4px;letter-spacing:.03em}
 .op{background:rgba(38,166,154,.14);color:#4dd0c4}
 .cl{background:rgba(239,83,80,.14);color:#f08a88}
+.dep{background:rgba(59,130,246,.16);color:#7ba9f5}
 .why{color:var(--faint);font-size:12px}
 
 footer{margin-top:38px;padding-top:20px;border-top:1px solid var(--line);
@@ -231,12 +232,17 @@ function render(){
   if(D.benchmark.length) s2.setData(conv(D.benchmark));
   ch.timeScale().fitContent();
 
+  // 'versa' e' un versamento di capitale, non un'operazione di mercato:
+  // deve stare qui, altrimenti l'equity salta nel grafico senza spiegazione.
+  const ETICHETTA={open:'apre',close:'chiude',deposit:'versa'};
+  const CLASSE={open:'op',close:'cl',deposit:'dep'};
   document.getElementById('ops').innerHTML=D.ops.map(o=>`<tr>
     <td class="mono">${new Date(o.ts).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</td>
-    <td><span class="pill ${o.action==='open'?'op':'cl'}">${o.action==='open'?'apre':'chiude'}</span></td>
-    <td>${nome(o.pair)}</td><td class="mono">${o.price?(+o.price).toFixed(4):''}</td>
+    <td><span class="pill ${CLASSE[o.action]||'cl'}">${ETICHETTA[o.action]||o.action}</span></td>
+    <td>${o.action==='deposit'?'—':nome(o.pair)}</td>
+    <td class="mono">${o.action!=='deposit'&&o.price?(+o.price).toFixed(4):''}</td>
     <td class="mono">${o.notional?(+o.notional).toFixed(2)+' €':''}</td>
-    <td class="mono">${o.leverage&&+o.leverage?(+o.leverage).toFixed(2)+'x':''}</td>
+    <td class="mono">${o.action!=='deposit'&&o.leverage&&+o.leverage?(+o.leverage).toFixed(2)+'x':''}</td>
     <td class="why">${o.reason||''}</td></tr>`).join('')
     ||'<tr><td colspan="7" class="skel">nessuna operazione ancora</td></tr>';
 

@@ -73,7 +73,11 @@ def costruisci() -> dict:
     if os.path.exists(JOURNAL_FILE):
         with open(JOURNAL_FILE) as f:
             for r in csv.DictReader(f):
-                if r.get("action") in ("open", "close"):
+                # 'deposit' va pubblicato: senza, l'equity raddoppia di colpo
+                # nel grafico e niente lo spiega. Un salto non spiegato in una
+                # curva di rendimento e' esattamente cio' che fa sembrare
+                # bravo un sistema che non lo e'.
+                if r.get("action") in ("open", "close", "deposit"):
                     ops.append({k: r.get(k, "") for k in CAMPI_OP})
     ops.reverse()
 
