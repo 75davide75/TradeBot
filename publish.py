@@ -79,6 +79,9 @@ def costruisci() -> dict:
         "n_ops": sum(1 for o in ops if o["action"] == "close"),
         "n_pos": len(pos),
         "posizioni": pos,
+        # L'universo serve alla dashboard per mostrare i grafici dei mercati
+        # sorvegliati anche quando non c'e' nessuna posizione aperta.
+        "universo": CFG.get("universe", []),
         "paused": state.get("paused", False),
         "halted": state.get("halted", False),
         "halt_reason": state.get("halt_reason", ""),

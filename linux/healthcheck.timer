@@ -1,0 +1,11 @@
+[Unit]
+Description=Controllo salute ogni mattina alle 9:00
+
+[Timer]
+OnCalendar=*-*-* 09:00:00
+# Se il Pi era spento alle 9, il controllo parte comunque al riavvio:
+# meglio un messaggio in ritardo che nessun messaggio.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

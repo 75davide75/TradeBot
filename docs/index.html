@@ -101,7 +101,13 @@ a{color:#6b9fe8;text-decoration:none}a:hover{text-decoration:underline}
 <h2>Andamento del portafoglio</h2>
 <div class="card eqbox"><div id="eq"></div></div>
 
-<h2>Posizioni aperte</h2>
+<h2>Rendimento annuo stimato</h2>
+<div class="card eqbox">
+  <div id="proj"></div>
+  <div id="projnote" style="padding:2px 2px 12px;font-size:12.5px;color:var(--faint)"></div>
+</div>
+
+<h2 id="postit">Mercati</h2>
 <div class="grid" id="pos"><div class="skel">caricamento…</div></div>
 
 <h2>Operazioni</h2>
@@ -132,6 +138,7 @@ let D=null, live=false, timer=null, prezzi={}, serie={};
 async function carica(){
   D=await (await fetch('data.json?t='+Date.now())).json();
   render();
+  proiezione();
   await candele();
   aggiorna();
 }
@@ -189,24 +196,76 @@ function render(){
     <a href="https://github.com/75davide75/TradeBot">github.com/75davide75/TradeBot</a>`;
 }
 
+function proiezione(){
+  const el=document.getElementById('proj'), nota=document.getElementById('projnote');
+  el.innerHTML='';
+  const H=D.equity||[];
+  if(H.length<3){nota.textContent=
+    'Servono almeno qualche giorno di storico prima di poter stimare un rendimento annuo. Adesso non ci sono abbastanza dati.';
+    return}
+  const r=[];
+  for(let i=1;i<H.length;i++){
+    const dt=(new Date(H[i].x)-new Date(H[i-1].x))/86400000;
+    if(dt>0&&H[i-1].y>0) r.push({t:H[i].x,g:(H[i].y/H[i-1].y-1)/dt});
+  }
+  if(!r.length){nota.textContent='Dati insufficienti.';return}
+  const serie=[],alto=[],basso=[];
+  let s=0,s2=0;
+  r.forEach((x,i)=>{
+    s+=x.g; s2+=x.g*x.g;
+    const n=i+1, m=s/n, sd=n>1?Math.sqrt(Math.max(0,(s2-n*m*m)/(n-1))):0;
+    const ann=m*365, err=n>1?sd/Math.sqrt(n)*365:0;
+    const time=Math.floor(new Date(x.t).getTime()/1000);
+    serie.push({time,value:ann*100});
+    alto.push({time,value:(ann+1.96*err)*100});
+    basso.push({time,value:(ann-1.96*err)*100});
+  });
+  const uniq=a=>a.filter((v,i,z)=>i===0||v.time>z[i-1].time);
+  const ch=LightweightCharts.createChart(el,{...opt,height:250});
+  const b=ch.addLineSeries({color:'rgba(139,144,153,.45)',lineWidth:1,lineStyle:2,priceLineVisible:false});
+  const a=ch.addLineSeries({color:'rgba(139,144,153,.45)',lineWidth:1,lineStyle:2,priceLineVisible:false});
+  const c=ch.addLineSeries({color:'#3b82f6',lineWidth:2,priceLineVisible:false});
+  b.setData(uniq(basso)); a.setData(uniq(alto)); c.setData(uniq(serie));
+  ch.timeScale().fitContent();
+  new ResizeObserver(()=>ch.applyOptions({width:el.clientWidth})).observe(el);
+
+  const u=serie[serie.length-1].value, lo=basso[basso.length-1].value, hi=alto[alto.length-1].value;
+  const gg=r.length;
+  nota.innerHTML=`Stima corrente <b class="${u>=0?'up':'down'}">${u>=0?'+':''}${u.toFixed(1)}% annuo</b>
+    — intervallo di confidenza al 95%: da ${lo.toFixed(1)}% a ${hi.toFixed(1)}%.
+    ${(lo<0&&hi>0)?'<b>Lo zero cade dentro questo intervallo: la stima non è ancora distinguibile da un rendimento nullo.</b>':''}
+    Basata su ${gg} osservazioni. Le linee tratteggiate sono i limiti dell'incertezza, non previsioni.`;
+}
+
 async function candele(){
   const box=document.getElementById('pos');
   const P=D.posizioni||{};
-  if(!Object.keys(P).length){box.innerHTML='<div class="skel">nessuna posizione aperta</div>';return}
-  box.innerHTML=Object.entries(P).map(([p,v])=>`
+  const aperte=Object.keys(P).length>0;
+  document.getElementById('postit').textContent=
+    aperte?'Posizioni aperte':'Mercati sorvegliati (nessuna posizione aperta)';
+
+  // Quando non c'e' nulla di aperto mostro comunque i grafici dell'universo:
+  // una pagina vuota non dice se il sistema sta lavorando o e' fermo.
+  const lista=aperte?Object.entries(P)
+    :(D.universo||[]).map(p=>[p,null]);
+  if(!lista.length){box.innerHTML='<div class="skel">nessun mercato configurato</div>';return}
+
+  box.innerHTML=lista.map(([p,v])=>`
     <div class="pos" data-p="${p}">
       <header><div><div class="sym">${nome(p)}
-        <span class="side ${v.side>0?'long':'short'}">${v.side>0?'LONG':'SHORT'}</span></div>
-        <div class="meta mono">ingresso ${(+v.entry).toFixed(4)} · leva ${(+v.leverage).toFixed(2)}x</div></div>
+        ${v?`<span class="side ${v.side>0?'long':'short'}">${v.side>0?'LONG':'SHORT'}</span>`
+           :'<span class="side" style="background:rgba(139,144,153,.14);color:#8b9099">IN ATTESA</span>'}</div>
+        <div class="meta mono">${v?`ingresso ${(+v.entry).toFixed(4)} · leva ${(+v.leverage).toFixed(2)}x`
+                                  :'nessuna posizione'}</div></div>
         <div class="pnl"><div class="p mono" data-pnl>—</div><div class="q mono" data-px>—</div></div>
       </header>
       <div class="chart" data-chart></div>
-      <div class="foot"><span>nozionale ${(+v.notional).toFixed(2)} €</span>
-        <span data-stop>stop a ${(-8/ (+v.leverage||1)).toFixed(1)}%</span></div>
+      <div class="foot"><span>${v?`nozionale ${(+v.notional).toFixed(2)} €`:'in osservazione'}</span>
+        <span>${v?`stop a ${(-8/(+v.leverage||1)).toFixed(1)}%`:''}</span></div>
     </div>`).join('');
 
   const da=Math.floor(Date.now()/1000)-3*86400;
-  for(const [p,v] of Object.entries(P)){
+  for(const [p,v] of lista){
     const el=document.querySelector(`.pos[data-p="${p}"] [data-chart]`);
     try{
       const r=await fetch(`https://futures.kraken.com/api/charts/v1/trade/${PERP[p]||p}/1h?from=${da}`);
@@ -217,7 +276,7 @@ async function candele(){
         borderUpColor:'#26a69a',borderDownColor:'#ef5350',
         wickUpColor:'#26a69a',wickDownColor:'#ef5350'});
       s.setData(c.map(k=>({time:Math.floor(k.time/1000),open:+k.open,high:+k.high,low:+k.low,close:+k.close})));
-      s.createPriceLine({price:+v.entry,color:'#8b9099',lineWidth:1,lineStyle:2,
+      if(v) s.createPriceLine({price:+v.entry,color:'#8b9099',lineWidth:1,lineStyle:2,
         axisLabelVisible:true,title:'ingresso'});
       ch.timeScale().fitContent();
       serie[p]={ch,s,ultima:c.length?c[c.length-1]:null};
@@ -230,15 +289,23 @@ async function aggiorna(){
   try{
     const t=await (await fetch('https://futures.kraken.com/derivatives/api/v3/tickers')).json();
     const m={}; t.tickers.forEach(x=>m[x.symbol.toUpperCase()]=x);
-    for(const [p,v] of Object.entries(D.posizioni||{})){
+    const P=D.posizioni||{};
+    const tutti=Object.keys(P).length?Object.keys(P):(D.universo||[]);
+    for(const p of tutti){
+      const v=P[p];
       const k=m[(PERP[p]||p).toUpperCase()]; if(!k) continue;
       const px=+(k.markPrice||k.last); prezzi[p]=px;
-      const mv=(px-v.entry)/v.entry*v.side, pl=v.notional*mv;
       const card=document.querySelector(`.pos[data-p="${p}"]`); if(!card) continue;
       const e=card.querySelector('[data-pnl]');
-      e.textContent=(pl>=0?'+':'')+pl.toFixed(2)+' €';
-      e.className='p mono '+(pl>=0?'up':'down');
-      card.querySelector('[data-px]').textContent=px.toFixed(4)+'  ('+pct(mv)+')';
+      if(v){
+        const mv=(px-v.entry)/v.entry*v.side, pl=v.notional*mv;
+        e.textContent=(pl>=0?'+':'')+pl.toFixed(2)+' €';
+        e.className='p mono '+(pl>=0?'up':'down');
+        card.querySelector('[data-px]').textContent=px.toFixed(4)+'  ('+pct(mv)+')';
+      }else{
+        e.textContent=px.toFixed(4); e.className='p mono';
+        card.querySelector('[data-px]').textContent='prezzo di mercato';
+      }
       const S=serie[p];
       if(S&&S.ultima){const u=S.ultima;
         S.s.update({time:Math.floor(u.time/1000),open:+u.open,

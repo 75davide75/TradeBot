@@ -1,0 +1,11 @@
+[Unit]
+Description=Controllo salute del sistema di trading
+
+[Service]
+Type=oneshot
+User=%i
+WorkingDirectory=/home/%i/trading
+Environment=USER=%i
+ExecStart=/usr/bin/python3 /home/%i/trading/healthcheck.py
+StandardOutput=journal
+StandardError=journal
