@@ -32,3 +32,6 @@ venv/
 
 # sistema
 .DS_Store
+
+# dati di ricerca scaricati: 3 MB di pickle, si rigenerano con perp_test/scarica.py
+perp_test/dati/
