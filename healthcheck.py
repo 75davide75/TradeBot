@@ -20,8 +20,8 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
-from core import (BASE, JOURNAL_FILE, STATE_FILE, fetch_price, load_config,
-                  modo_perp)
+from core import (BASE, DATA_DIR, JOURNAL_FILE, STATE_FILE, fetch_price,
+                  load_config, modo_perp)
 
 CFG = load_config()
 
@@ -90,6 +90,35 @@ def main():
             righe.append(f"🛑 bloccato: {st.get('halt_reason','')}")
         if st.get("paused"):
             righe.append("⏸️ in pausa")
+
+        # --- e' lo STESSO stato di ieri, o e' stato azzerato?
+        #
+        # Il controllo qui sopra guarda se lo stato e' RECENTE. Uno stato
+        # appena azzerato e' recentissimo: e' esattamente il motivo per cui i
+        # due azzeramenti di agosto sono passati inosservati, con questo
+        # messaggio che scriveva "tutto in ordine" mentre lo storico spariva.
+        segna = os.path.join(DATA_DIR, "ultimo_controllo.json")
+        try:
+            prec = json.load(open(segna)) if os.path.exists(segna) else {}
+            adesso = {"created": st.get("created"),
+                      "n_storico": len(st.get("history", []))}
+            if prec:
+                if (prec.get("created") and adesso["created"]
+                        and prec["created"] != adesso["created"]):
+                    problemi.append(
+                        f"lo stato e' stato AZZERATO (era del "
+                        f"{prec['created'][:19]}, ora e' del "
+                        f"{adesso['created'][:19]})")
+                    righe.append("🔴 stato azzerato dall'ultimo controllo")
+                elif adesso["n_storico"] < prec.get("n_storico", 0):
+                    problemi.append(
+                        f"lo storico si e' accorciato: da "
+                        f"{prec['n_storico']} a {adesso['n_storico']} punti")
+                    righe.append("🔴 storico accorciato")
+            with open(segna, "w") as f:
+                json.dump(adesso, f)
+        except Exception as e:
+            righe.append(f"⚠️ controllo di continuita' non eseguito: {e}")
     except Exception as e:
         problemi.append(f"state.json illeggibile: {e}")
         righe.append(f"❌ stato non leggibile: {e}")

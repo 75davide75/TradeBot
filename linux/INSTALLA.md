@@ -3,14 +3,42 @@
 Testato per Raspberry Pi OS 64-bit. Funziona identico su Debian/Ubuntu,
 incluse le VM ARM gratuite di Oracle Cloud.
 
-## 1. Copia il progetto sul Pi
+## 0. Dove vivono i dati — leggi questo prima di tutto
 
-Dal Mac, sostituendo `pi@raspberrypi.local` con il tuo utente e hostname:
+`state.json`, `journal.csv` e `report/` **non** stanno nella cartella del
+codice: stanno in `~/trading-dati/`.
+
+La cartella del codice è **sacrificabile**: ci puoi copiare sopra, cancellarla,
+rifarla da git, e lo storico non si muove. Questo non è un dettaglio di gusto —
+quando i dati stavano dentro la cartella del codice si sono azzerati due volte
+durante i deploy, il 10 e l'11 agosto 2026, portandosi via 74 punti di storico e
+8 posizioni aperte.
+
+Al primo avvio dopo l'aggiornamento il bot **sposta i file da solo** dalla
+vecchia posizione e lo scrive nel log. Non devi fare nulla a mano.
+
+Se il bot trova il journal ma non lo stato, **non riparte**: manda un messaggio
+su Telegram e si ferma, perché ripartire da zero cancellerebbe la storia del
+conto senza dirlo. Per azzerare di proposito:
 
 ```bash
-cd "/Users/davidesogos/Desktop"
-scp -r "progetto trading" pi@raspberrypi.local:~/trading
+TRADEBOT_NUOVO_CONTO=1 python3 bot.py
 ```
+
+## 1. Copia il progetto sul Pi
+
+Dal Mac, usa `./sync.sh` (configuralo una volta con utente e hostname del Pi).
+Per la primissima copia, dalla cartella del progetto:
+
+```bash
+rsync -avz --exclude '.git/' --exclude '__pycache__/' --exclude '*.pyc' \
+      --exclude 'state.json' --exclude 'journal.csv' --exclude 'report/' \
+      ./ pi@raspberrypi.local:~/trading/
+```
+
+**Non usare `scp -r` della cartella intera:** copierebbe anche `state.json`,
+sovrascrivendo lo storico del Pi con quello del Mac. È esattamente il guasto
+descritto al punto 0.
 
 ## 2. Dipendenze
 

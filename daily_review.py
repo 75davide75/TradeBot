@@ -26,11 +26,10 @@ from datetime import datetime, timedelta, timezone
 import numpy as np
 import pandas as pd
 
-from core import (BASE, JOURNAL_FILE, equity, fetch_ohlc, fetch_price,
+from core import (JOURNAL_FILE, REPORT_DIR, equity, fetch_ohlc, fetch_price,
                   load_config, load_state, realized_vol, target_leverage)
 
 CFG = load_config()
-REPORT_DIR = os.path.join(BASE, "report")
 
 
 def send(text: str):
