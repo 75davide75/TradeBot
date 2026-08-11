@@ -24,6 +24,7 @@ import pandas as pd
 # 'from core import STATE_FILE' continua a funzionare ovunque.
 from stato import (BASE, CONFIG_FILE, DATA_DIR, JOURNAL_FILE,  # noqa: F401
                    REPORT_DIR, STATE_FILE, StatoPerduto, adegua_capitale,
+                   allinea_ombra_se_ferma,
                    blank_state, ha_operato, journal, load_state,
                    migra_se_serve, save_state)
 
@@ -312,6 +313,69 @@ def close_position(state, pair, price, reason):
             notional=round(p["notional"], 2), leverage=p["leverage"],
             equity=round(state["cash"], 2), reason=reason, confirmed=True)
     return pnl - carry - fee
+
+
+# --------------------------------------------------------------------------
+# PORTAFOGLIO OMBRA
+#
+# Gira in parallelo a quello vero, rispecchiando OGNI sua azione: apre quando
+# apre, chiude quando chiude, sugli stessi mercati e nella stessa direzione.
+# Cambia una cosa sola: la leva e' fissa a 1x invece di seguire la volatilita'.
+#
+# Serve a rispondere a una domanda che altrimenti resta un'opinione: il
+# volatility targeting aiuta o fa danni? Con un solo portafoglio non lo si puo'
+# sapere, perche' non esiste il controfattuale. Con due che differiscono in una
+# sola variabile, la differenza fra i due E' l'effetto di quella variabile.
+#
+# ATTENZIONE nel leggere il confronto: a leva 1x l'ombra e' piu' esposta (oggi
+# le leve reali stanno fra 0,33 e 0,70), quindi ci si aspetta che guadagni E
+# perda di piu'. Il confronto onesto non e' fra le due equity, ma fra
+# rendimento e rischio: per questo pubblichiamo anche la volatilita' di
+# entrambe.
+# --------------------------------------------------------------------------
+LEVA_OMBRA = 1.0
+
+
+def _giorni_aperta(p: dict) -> float:
+    return max(0.0, (datetime.now(timezone.utc) -
+                     datetime.fromisoformat(p["opened"])).days)
+
+
+def apri_ombra(state, pair, side, price, notional):
+    taker, apert, _ = costi_correnti()
+    # Da qui in poi l'ombra ha una storia sua e non va piu' riallineata.
+    state["shadow_avviato"] = True
+    state["shadow_cash"] = state.get("shadow_cash", 0.0) - notional * (taker + apert)
+    state.setdefault("shadow_positions", {})[pair] = {
+        "side": side, "entry": price, "notional": notional,
+        "leverage": LEVA_OMBRA,
+        "opened": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def chiudi_ombra(state, pair, price) -> float:
+    p = state.get("shadow_positions", {}).pop(pair, None)
+    if not p:
+        return 0.0
+    move = (price - p["entry"]) / p["entry"] * p["side"]
+    pnl = p["notional"] * move
+    carry = p["notional"] * carry_giornaliero(pair, p["side"]) * _giorni_aperta(p)
+    taker, _, _ = costi_correnti()
+    netto = pnl - carry - p["notional"] * taker
+    state["shadow_cash"] = state.get("shadow_cash", 0.0) + netto
+    return netto
+
+
+def equity_ombra(state: dict, prices: dict) -> float:
+    eq = state.get("shadow_cash", 0.0)
+    for pair, p in state.get("shadow_positions", {}).items():
+        px = prices.get(pair)
+        if px is None:
+            continue
+        move = (px - p["entry"]) / p["entry"] * p["side"]
+        eq += p["notional"] * move
+        eq -= p["notional"] * carry_giornaliero(pair, p["side"]) * _giorni_aperta(p)
+    return eq
 
 
 def check_kill_switch(state: dict, eq: float, cfg: dict) -> bool:

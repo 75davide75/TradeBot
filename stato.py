@@ -221,11 +221,39 @@ def adegua_capitale(state: dict, cfg: dict) -> float:
     state["cash"] = float(state.get("cash", 0.0)) + delta
     state["capitale_versato"] = voluto
     state["peak_equity"] = float(state.get("peak_equity", 0.0)) + delta
+    # Anche l'ombra riceve il versamento. Senza, il portafoglio vero avrebbe
+    # soldi che l'ombra non ha mai ricevuto e il confronto fra i due — che e'
+    # tutto il motivo per cui l'ombra esiste — sarebbe truccato.
+    state["shadow_cash"] = float(state.get("shadow_cash", versato)) + delta
     journal("deposit", notional=round(delta, 2), equity=round(state["cash"], 2),
             reason=f"versamento: capitale da {versato:.2f} a {voluto:.2f} EUR",
             confirmed=True)
     print(f"[capitale] versati {delta:.2f} EUR: da {versato:.2f} a {voluto:.2f}")
     return delta
+
+
+def allinea_ombra_se_ferma(state: dict) -> bool:
+    """
+    Finche' l'ombra non ha mai aperto una posizione, la sua cassa segue il
+    capitale versato.
+
+    Serve alle installazioni dove l'ombra e' stata aggiunta a conto gia'
+    avviato: senza questo partirebbe dal capitale sbagliato e ogni confronto
+    successivo sarebbe falsato di quella differenza, per sempre.
+
+    Il flag 'shadow_avviato' e' necessario: non basta guardare se ci sono
+    posizioni aperte, perche' un'ombra che ha gia' operato e poi chiuso tutto
+    ne avrebbe zero, e riallinearla le cancellerebbe il P&L accumulato.
+    """
+    if state.get("shadow_avviato"):
+        return False
+    atteso = float(state.get("capitale_versato", state.get("cash", 0.0)))
+    if abs(float(state.get("shadow_cash", 0.0)) - atteso) < 0.005:
+        return False
+    print(f"[ombra] non ha ancora operato: cassa allineata da "
+          f"{state.get('shadow_cash', 0.0):.2f} a {atteso:.2f} EUR")
+    state["shadow_cash"] = atteso
+    return True
 
 
 def save_state(state: dict) -> None:

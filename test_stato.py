@@ -245,5 +245,57 @@ class TestCapitale(unittest.TestCase):
             self.assertIn("100.0", testo)
 
 
+class TestOmbra(unittest.TestCase):
+    """
+    Il portafoglio ombra serve a rispondere a 'il volatility targeting aiuta?'.
+    Perche' quel confronto significhi qualcosa, l'ombra deve partire dallo
+    stesso capitale e ricevere gli stessi versamenti: qualunque differenza
+    iniziale si trascina per sempre nel confronto.
+    """
+
+    def test_il_versamento_arriva_anche_all_ombra(self):
+        with tempfile.TemporaryDirectory() as d:
+            s = carica_stato(d)
+            st = s.load_state({"capital": 100.0})
+            st["cash"] = 100.0
+            st["shadow_cash"] = 100.0
+            s.save_state(st)
+
+            st = s.load_state({"capital": 200.0})
+            s.adegua_capitale(st, {"capital": 200.0})
+            self.assertAlmostEqual(st["cash"], 200.0)
+            self.assertAlmostEqual(st["shadow_cash"], 200.0,
+                                   msg="l'ombra non ha ricevuto il versamento")
+
+    def test_ombra_mai_avviata_viene_allineata(self):
+        """Caso di un conto gia' in corso a cui l'ombra viene aggiunta dopo."""
+        with tempfile.TemporaryDirectory() as d:
+            s = carica_stato(d)
+            st = s.load_state({"capital": 200.0})
+            st["capitale_versato"] = 200.0
+            st["shadow_cash"] = 100.0          # rimasta indietro
+            self.assertTrue(s.allinea_ombra_se_ferma(st))
+            self.assertAlmostEqual(st["shadow_cash"], 200.0)
+
+    def test_ombra_gia_avviata_non_viene_toccata(self):
+        """Riallinearla cancellerebbe il P&L che ha accumulato."""
+        with tempfile.TemporaryDirectory() as d:
+            s = carica_stato(d)
+            st = s.load_state({"capital": 200.0})
+            st["capitale_versato"] = 200.0
+            st["shadow_cash"] = 173.5          # ha perso operando: e' un dato
+            st["shadow_avviato"] = True
+            self.assertFalse(s.allinea_ombra_se_ferma(st))
+            self.assertAlmostEqual(st["shadow_cash"], 173.5)
+
+    def test_ombra_gia_allineata_non_fa_nulla(self):
+        with tempfile.TemporaryDirectory() as d:
+            s = carica_stato(d)
+            st = s.load_state({"capital": 200.0})
+            st["capitale_versato"] = 200.0
+            st["shadow_cash"] = 200.0
+            self.assertFalse(s.allinea_ombra_se_ferma(st))
+
+
 if __name__ == "__main__":
     unittest.main()

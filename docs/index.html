@@ -115,7 +115,9 @@ a{color:#6b9fe8;text-decoration:none}a:hover{text-decoration:underline}
 <div class="kpis" id="kpis"></div>
 
 <h2>Andamento del portafoglio</h2>
-<div class="card eqbox"><div id="eq"></div></div>
+<div class="card eqbox"><div id="eq"></div>
+  <div id="eqnote" style="padding:6px 2px 12px;font-size:12.5px;color:var(--faint)"></div>
+</div>
 
 <h2>Rendimento annuo stimato</h2>
 <div class="card eqbox">
@@ -219,18 +221,37 @@ function render(){
      <div class="d">${diff==null?'dati insufficienti':(diff>=0?'meglio di BTC':'peggio di BTC')}</div></div>
    <div class="kpi"><div class="l">Posizioni aperte</div>
      <div class="v mono">${D.n_pos}</div>
-     <div class="d">${D.n_ops} chiuse finora</div></div>`;
+     <div class="d">${D.n_ops} chiuse finora</div></div>
+   ${D.ombra_ora==null?'':`
+   <div class="kpi"><div class="l">Senza volatility targeting</div>
+     <div class="v ${cls(D.ombra_ora/D.capitale-1)} mono">${eur(D.ombra_ora)}</div>
+     <div class="d">portafoglio ombra, leva fissa 1x</div></div>`}`;
 
   const eqEl=document.getElementById('eq'); eqEl.innerHTML='';
   const ch=crea(eqEl);
   const s1=ch.addAreaSeries({lineColor:'#3b82f6',topColor:'rgba(59,130,246,.22)',
     bottomColor:'rgba(59,130,246,0)',lineWidth:2,priceLineVisible:false});
   const s2=ch.addLineSeries({color:'#eb6834',lineWidth:2,lineStyle:2,priceLineVisible:false});
+  // Portafoglio ombra: stesse decisioni, leva fissa 1x. Tratteggiato e
+  // smorzato perche' e' un metro di paragone, non un risultato.
+  const s3=ch.addLineSeries({color:'#9b8bd6',lineWidth:1,lineStyle:3,priceLineVisible:false});
   const conv=a=>a.map(p=>({time:Math.floor(new Date(p.x).getTime()/1000),value:p.y}))
                  .filter((v,i,a)=>i===0||v.time>a[i-1].time);
   if(D.equity.length) s1.setData(conv(D.equity));
   if(D.benchmark.length) s2.setData(conv(D.benchmark));
+  if((D.ombra||[]).length) s3.setData(conv(D.ombra));
   ch.timeScale().fitContent();
+
+  document.getElementById('eqnote').innerHTML=
+   `<span style="color:#3b82f6">━</span> portafoglio ·
+    <span style="color:#eb6834">╌</span> solo BTC, con gli stessi versamenti` +
+   ((D.ombra||[]).length
+     ? ` · <span style="color:#9b8bd6">┈</span> ombra: stesse decisioni, leva fissa 1x
+         <br>L'ombra è più esposta (le leve reali oggi stanno sotto 1x), quindi
+         è normale che guadagni e perda di più. Il confronto che conta non è
+         quale linea sta più in alto, ma quanto rendimento produce ciascuna
+         per unità di oscillazione.`
+     : ` · l'ombra comparirà dopo la prima operazione`);
 
   // 'versa' e' un versamento di capitale, non un'operazione di mercato:
   // deve stare qui, altrimenti l'equity salta nel grafico senza spiegazione.

@@ -53,11 +53,13 @@ def costruisci() -> dict:
     vers_origine = (float(hist[0].get("versato", hist[0].get("equity", CFG["capital"])))
                     if hist else float(CFG["capital"]))
 
-    equity, bench = [], []
+    equity, bench, ombra = [], [], []
     prec_btc = prec_vers = None
     valore = None
     for h in hist:
         equity.append({"x": h["ts"], "y": round(h["equity"], 4)})
+        if h.get("ombra") is not None:
+            ombra.append({"x": h["ts"], "y": round(float(h["ombra"]), 4)})
         btc = h.get("btc")
         vers = float(h.get("versato", vers_origine))
         if not btc:
@@ -101,6 +103,10 @@ def costruisci() -> dict:
         "capitale": cap,
         "equity": equity,
         "benchmark": bench,
+        # Portafoglio ombra: stesse decisioni, leva fissa 1x invece del
+        # volatility targeting. Serve a misurare se l'aggiustamento aiuta.
+        "ombra": ombra,
+        "ombra_ora": ombra[-1]["y"] if ombra else None,
         "eq_ora": equity[-1]["y"] if equity else cap,
         "bh_ora": bench[-1]["y"] if bench else None,
         "ops": ops[:100],

@@ -24,8 +24,10 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 
-from core import (DATA_DIR, StatoPerduto, adegua_capitale, check_kill_switch,
-                  close_position, equity, fetch_ohlc, fetch_price, journal,
+from core import (DATA_DIR, LEVA_OMBRA, StatoPerduto, adegua_capitale,
+                  allinea_ombra_se_ferma,
+                  apri_ombra, check_kill_switch, chiudi_ombra, close_position,
+                  equity, equity_ombra, fetch_ohlc, fetch_price, journal,
                   load_config, load_state, migra_se_serve, open_position,
                   order_minimum, save_state, signal_momentum, target_leverage)
 
@@ -96,17 +98,22 @@ def send(text: str, keyboard=None):
     return res
 
 
-def snapshot(state, eq):
-    """Registra equity e prezzo BTC insieme: serve al benchmark buy&hold."""
+def snapshot(state, eq, prices=None):
+    """Registra equity, ombra e prezzo BTC insieme: servono ai confronti."""
     try:
         btc = fetch_price("XXBTZEUR")
     except Exception:
         btc = None
+    try:
+        ombra = round(equity_ombra(state, prices or {}), 4)
+    except Exception:
+        ombra = None
     # 'versato' viaggia con ogni punto: senza, il confronto con il buy&hold
     # sarebbe falsato dopo un versamento (il benchmark non avrebbe ricevuto
     # gli stessi soldi nello stesso momento).
     state["history"].append({"ts": datetime.now(timezone.utc).isoformat(),
                              "equity": round(eq, 4), "btc": btc,
+                             "ombra": ombra,
                              "versato": round(float(state.get(
                                  "capitale_versato", CFG["capital"])), 4)})
     state["history"] = state["history"][-5000:]
@@ -146,6 +153,8 @@ def risk_check():
         if perdita <= -CFG["stop_loss_pct"]:
             close_position(state, pair, px,
                            f"STOP-LOSS automatico a {perdita:.1%}")
+            # L'ombra esce insieme: cambia la leva, non le decisioni.
+            chiudi_ombra(state, pair, px)
             chiuse.append(f"{pair} a {perdita:+.1%}")
 
     if chiuse:
@@ -219,7 +228,7 @@ def evaluate():
              f"Equity {eq:.2f} €. Serve /resume manuale.")
         return
 
-    snapshot(state, eq)
+    snapshot(state, eq, prices)
     scrivi_conferme(state, conferme)
     save_state(state)
 
@@ -282,9 +291,14 @@ def execute(cid: str, auto: bool = False) -> str:
     if p["pair"] in state["positions"]:
         close_position(state, p["pair"], px,
                        "auto-chiusura" if auto else "conferma utente")
+        chiudi_ombra(state, p["pair"], px)          # l'ombra rispecchia
     if p["want"] != 0.0 and not auto:
         open_position(state, p["pair"], p["want"], px, p["notional"],
                       p["leverage"], p["why"])
+        # Stesso mercato, stessa direzione, stesso momento. L'unica differenza
+        # e' la leva: fissa a 1x invece che tarata sulla volatilita'.
+        alloc_o = equity_ombra(state, {p["pair"]: px}) / max(1, len(CFG["universe"]))
+        apri_ombra(state, p["pair"], p["want"], px, alloc_o * LEVA_OMBRA)
 
     save_state(state)
     eq = equity(state, {p["pair"]: px})
@@ -308,6 +322,7 @@ def chiudi_tutto(state, motivo: str) -> list:
         try:
             px = fetch_price(pair)
             pnl = close_position(state, pair, px, motivo)
+            chiudi_ombra(state, pair, px)
             chiuse.append(f"{pair} ({pnl:+.2f} €)")
         except Exception as e:
             chiuse.append(f"{pair} ERRORE: {e}")
@@ -437,6 +452,8 @@ def controlla_stato_allavvio():
     # farebbe apparire una perdita che non e' mai avvenuta.
     st = load_state(CFG)
     delta = adegua_capitale(st, CFG)
+    if allinea_ombra_se_ferma(st):
+        save_state(st)
     if delta:
         save_state(st)
         send(f"💶 <b>Versamento registrato</b>\n"
