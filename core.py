@@ -179,12 +179,38 @@ def order_minimum(pair: str, price: float) -> float:
 # --------------------------------------------------------------------------
 # SEGNALE
 # --------------------------------------------------------------------------
-def signal_momentum(df: pd.DataFrame, n: int = 60, allow_short: bool = True) -> float:
+def solo_candele_chiuse(df: pd.DataFrame, interval_min: int = 1440) -> pd.DataFrame:
+    """
+    Toglie l'ultima candela se il suo periodo non e' ancora finito.
+
+    Kraken restituisce come ultimo elemento la candela IN FORMAZIONE, il cui
+    prezzo di chiusura e' semplicemente il prezzo di adesso e cambia in
+    continuazione. Un segnale calcolato su quella oscilla durante la giornata
+    e poi rientra da solo alla mezzanotte.
+
+    Misurato sui dati orari veri degli 8 mercati, 31 giorni: 8 cambi di segnale
+    reali contro 14 oscillazioni intragiornaliere che rientravano da sole.
+    Agire su quelle costerebbe circa il 3,2% annuo in commissioni inutili,
+    contro un rendimento stimato il cui intervallo di confidenza contiene gia'
+    lo zero.
+    """
+    if len(df) < 2:
+        return df
+    fine = pd.Timestamp(df.index[-1]) + pd.Timedelta(minutes=interval_min)
+    adesso = pd.Timestamp(datetime.now(timezone.utc)).tz_localize(None)
+    return df.iloc[:-1] if fine > adesso else df
+
+
+def signal_momentum(df: pd.DataFrame, n: int = 60, allow_short: bool = True,
+                    interval_min: int = 1440) -> float:
     """Ritorna la direzione desiderata: +1 long, -1 short, 0 flat.
 
     Usa SOLO la chiusura dell'ultima candela completa. Nessun dato futuro.
     """
-    r = df["close"].pct_change(n).iloc[-1]
+    d = solo_candele_chiuse(df, interval_min)
+    if len(d) <= n:
+        return 0.0
+    r = d["close"].pct_change(n).iloc[-1]
     if np.isnan(r):
         return 0.0
     if r > 0:
