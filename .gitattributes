@@ -1,0 +1,10 @@
+# docs/data.json e' dato DERIVATO, rigenerato dal Pi ogni 30 minuti a partire
+# da state.json. Non ha una storia che valga la pena preservare, e se Mac e Pi
+# lo scrivono entrambi git prova a fonderlo riga per riga producendo conflitti
+# su un file che verra' comunque sovrascritto tra mezz'ora.
+#
+# 'binary' dice a git di trattarlo come indivisibile: niente merge riga per
+# riga, si sceglie una versione intera e si va avanti.
+#
+# Regola operativa: publish.py lo lancia SOLO il Raspberry. Mai dal Mac.
+docs/data.json binary
