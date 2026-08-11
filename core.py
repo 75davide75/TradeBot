@@ -30,6 +30,27 @@ TAKER_FEE = 0.0040
 MARGIN_OPEN_FEE = 0.0002
 ROLLOVER_DAILY = 0.0012
 
+# Su quale mercato operiamo. Impostato da load_config().
+#
+#   spot_margin : commissione 0,26%/lato + rollover 0,12% AL GIORNO (44%/anno)
+#   perpetual   : commissione 0,05%/lato, nessun rollover, funding che
+#                 stando short spesso si INCASSA invece di pagarlo
+#
+# Nel backtest la differenza valeva 19 punti percentuali su tre coppie.
+_MODO = {"perp": False}
+
+
+def modo_perp() -> bool:
+    return _MODO["perp"]
+
+
+def costi_correnti() -> tuple:
+    """(commissione per lato, fee apertura, costo di mantenimento giornaliero)."""
+    if _MODO["perp"]:
+        import perp
+        return perp.FUT_TAKER, 0.0, 0.0      # il carry lo gestisce il funding
+    return TAKER_FEE, MARGIN_OPEN_FEE, ROLLOVER_DAILY
+
 
 # Valori di riserva per ogni parametro. Servono perche' config.json e' escluso
 # da git (contiene il token), quindi codice e configurazione possono
@@ -86,6 +107,11 @@ def load_config() -> dict:
             riempiti.append(f"{k}={v}")
     if riempiti:
         print(f"[config] parametri mancanti, uso i default: {', '.join(riempiti)}")
+
+    _MODO["perp"] = cfg.get("market_type") == "perpetual"
+    if _MODO["perp"]:
+        print("[config] mercato: FUTURES PERPETUI "
+              "(commissione 0.05%/lato, nessun rollover, funding attivo)")
     return cfg
 
 
@@ -93,6 +119,9 @@ def load_config() -> dict:
 # DATI
 # --------------------------------------------------------------------------
 def fetch_ohlc(pair: str, interval: int = 1440) -> pd.DataFrame:
+    if _MODO["perp"]:
+        import perp
+        return perp.fetch_ohlc(pair, "1d" if interval >= 1440 else "1h")
     url = f"https://api.kraken.com/0/public/OHLC?pair={pair}&interval={interval}"
     with urllib.request.urlopen(url, timeout=30) as r:
         payload = json.load(r)
@@ -108,6 +137,9 @@ def fetch_ohlc(pair: str, interval: int = 1440) -> pd.DataFrame:
 
 
 def fetch_price(pair: str) -> float:
+    if _MODO["perp"]:
+        import perp
+        return perp.fetch_price(pair)
     url = f"https://api.kraken.com/0/public/Ticker?pair={pair}"
     with urllib.request.urlopen(url, timeout=20) as r:
         res = json.load(r)["result"]
@@ -129,6 +161,9 @@ def order_minimum(pair: str, price: float) -> float:
     Un simulatore che ignora i vincoli di esecuzione non e' un simulatore,
     e' un generatore di illusioni.
     """
+    if _MODO["perp"]:
+        import perp
+        return perp.order_minimum(pair, price)
     if not _MIN_CACHE:
         url = "https://api.kraken.com/0/public/AssetPairs"
         with urllib.request.urlopen(url, timeout=30) as r:
@@ -230,6 +265,25 @@ def journal(action: str, **fields) -> None:
         w.writerow(row)
 
 
+def carry_giornaliero(pair: str, side: float) -> float:
+    """
+    Costo (o ricavo) di tenere aperta una posizione, per giorno, come frazione
+    del nozionale.
+
+    Spot a margine: rollover fisso, si paga SEMPRE, in entrambe le direzioni.
+    Perpetui: funding. Con segno positivo lo pagano i long e lo incassano gli
+    short, quindi per una posizione short il valore restituito e' NEGATIVO —
+    cioe' un ricavo. E' la differenza che vale 19 punti nel backtest.
+    """
+    if not _MODO["perp"]:
+        return ROLLOVER_DAILY
+    import perp
+    try:
+        return perp.funding_corrente(pair) * 24 * side
+    except Exception:
+        return 0.0
+
+
 def equity(state: dict, prices: dict) -> float:
     """Valore corrente del conto: cash + P&L aperto, al netto del carry."""
     eq = state["cash"]
@@ -241,12 +295,13 @@ def equity(state: dict, prices: dict) -> float:
         eq += p["notional"] * move
         days = max(0.0, (datetime.now(timezone.utc) -
                          datetime.fromisoformat(p["opened"])).days)
-        eq -= p["notional"] * ROLLOVER_DAILY * days
+        eq -= p["notional"] * carry_giornaliero(pair, p["side"]) * days
     return eq
 
 
 def open_position(state, pair, side, price, notional, leverage, reason):
-    fee = notional * (TAKER_FEE + MARGIN_OPEN_FEE)
+    taker, apert, _ = costi_correnti()
+    fee = notional * (taker + apert)
     state["cash"] -= fee
     state["positions"][pair] = {
         "side": side, "entry": price, "notional": notional,
@@ -262,8 +317,9 @@ def close_position(state, pair, price, reason):
     pnl = p["notional"] * move
     days = max(0.0, (datetime.now(timezone.utc) -
                      datetime.fromisoformat(p["opened"])).days)
-    carry = p["notional"] * ROLLOVER_DAILY * days
-    fee = p["notional"] * TAKER_FEE
+    carry = p["notional"] * carry_giornaliero(pair, p["side"]) * days
+    taker, _, _ = costi_correnti()
+    fee = p["notional"] * taker
     state["cash"] += pnl - carry - fee
     journal("close", pair=pair, side=p["side"], price=price,
             notional=round(p["notional"], 2), leverage=p["leverage"],

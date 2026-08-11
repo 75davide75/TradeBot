@@ -50,22 +50,49 @@ def scrivi_conferme(state, c: dict) -> None:
 
 
 def tg(method: str, **params):
+    """
+    Chiamata all'API Telegram.
+
+    Intercetta DUE tipi di fallimento, non uno solo: l'errore di rete e la
+    risposta con ok=false. Il secondo mancava, ed e' costato ore di
+    diagnosi: il bot apriva posizioni e le notifiche venivano rifiutate da
+    Telegram per un problema di formattazione, senza che nulla lo segnalasse.
+    Un errore silenzioso e' peggio di un crash: il crash almeno si vede.
+    """
     data = urllib.parse.urlencode(
         {k: (json.dumps(v) if isinstance(v, (dict, list)) else v)
          for k, v in params.items()}).encode()
     try:
         with urllib.request.urlopen(f"{API}/{method}", data=data, timeout=40) as r:
-            return json.load(r)
+            res = json.load(r)
+        if not res.get("ok", False):
+            print(f"[tg] {method} RIFIUTATO da Telegram: {res.get('description')}")
+        return res
     except Exception as e:
-        print(f"[tg] {method}: {e}")
-        return {}
+        print(f"[tg] {method} errore di rete: {e}")
+        return {"ok": False, "description": str(e)}
 
 
 def send(text: str, keyboard=None):
+    """
+    Invia un messaggio. Se Telegram rifiuta l'HTML, ritenta in testo semplice:
+    meglio una notifica brutta che nessuna notifica.
+    """
     p = {"chat_id": CHAT, "text": text, "parse_mode": "HTML"}
     if keyboard:
         p["reply_markup"] = {"inline_keyboard": keyboard}
-    return tg("sendMessage", **p)
+    res = tg("sendMessage", **p)
+
+    if not res.get("ok", False):
+        import re
+        semplice = re.sub(r"</?[bi]>", "", text)
+        p2 = {"chat_id": CHAT, "text": semplice}
+        if keyboard:
+            p2["reply_markup"] = {"inline_keyboard": keyboard}
+        res = tg("sendMessage", **p2)
+        if not res.get("ok", False):
+            print(f"[send] messaggio NON consegnato: {text[:80]}")
+    return res
 
 
 def snapshot(state, eq):
