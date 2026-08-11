@@ -3,6 +3,13 @@ Description=Trading bot paper — segnali Telegram
 After=network-online.target
 Wants=network-online.target
 
+# Se il bot si blocca all'avvio perche' lo stato e' sparito, riprovare
+# all'infinito non serve: il problema non si risolve da solo. Dopo tre
+# tentativi systemd lascia il servizio in stato "failed", che healthcheck.py
+# vede e segnala nel messaggio del mattino.
+StartLimitIntervalSec=300
+StartLimitBurst=3
+
 [Service]
 Type=simple
 User=%i

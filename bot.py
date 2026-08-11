@@ -17,16 +17,17 @@ soldi veri neanche volendo.
 """
 
 import json
+import os
 import time
 import traceback
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 
-from core import (check_kill_switch, close_position, equity, fetch_ohlc,
-                  fetch_price, journal, load_config, load_state,
-                  open_position, order_minimum, save_state, signal_momentum,
-                  target_leverage)
+from core import (DATA_DIR, StatoPerduto, check_kill_switch, close_position,
+                  equity, fetch_ohlc, fetch_price, journal, load_config,
+                  load_state, migra_se_serve, open_position, order_minimum,
+                  save_state, signal_momentum, target_leverage)
 
 CFG = load_config()
 API = f"https://api.telegram.org/bot{CFG['telegram_token']}"
@@ -390,7 +391,45 @@ def status() -> str:
 
 
 # --------------------------------------------------------------------------
+MARCATORE_ALLARME = os.path.join(DATA_DIR, ".allarme_stato_inviato")
+
+
+def controlla_stato_allavvio():
+    """
+    Prima di ogni altra cosa: i dati sono al loro posto?
+
+    Se il journal dice che il sistema ha gia' operato ma lo stato non c'e',
+    il bot NON riparte. Ripartire da zero con il capitale iniziale cancella
+    la storia del conto senza che nessuno se ne accorga: e' successo il 10 e
+    l'11 agosto 2026, e sono andati persi 74 punti di storico e 8 posizioni.
+    """
+    for nome in migra_se_serve():
+        print(f"[avvio] migrato {nome} nella cartella dati")
+
+    try:
+        load_state(CFG)
+    except StatoPerduto as e:
+        # systemd riavvia ogni 30 secondi: senza il marcatore manderebbe lo
+        # stesso allarme all'infinito.
+        if not os.path.exists(MARCATORE_ALLARME):
+            send("🛑 <b>AVVIO BLOCCATO — stato non trovato</b>\n\n"
+                 f"{e}\n\n"
+                 "<i>Il bot non riparte da solo: ripartire da zero "
+                 "cancellerebbe lo storico senza dirlo.</i>")
+            try:
+                open(MARCATORE_ALLARME, "w").close()
+            except Exception:
+                pass
+        print(f"[avvio] BLOCCATO: {e}")
+        raise SystemExit(1)
+
+    if os.path.exists(MARCATORE_ALLARME):
+        os.remove(MARCATORE_ALLARME)
+
+
 def main():
+    controlla_stato_allavvio()
+
     modo = ("ESECUZIONE AUTOMATICA" if CFG.get("auto_execute")
             else "conferma manuale")
     send("🤖 <b>Bot avviato</b> — paper trading\n"
