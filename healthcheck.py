@@ -21,7 +21,7 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 
 from core import (BASE, DATA_DIR, JOURNAL_FILE, STATE_FILE, fetch_price,
-                  load_config, modo_perp)
+                  load_config, migra_se_serve, modo_perp)
 
 CFG = load_config()
 
@@ -52,6 +52,7 @@ def servizio_attivo(nome: str) -> bool:
 
 
 def main():
+    migra_se_serve()      # puo' partire prima del bot dopo un aggiornamento
     ora = datetime.now(timezone.utc)
     utente = os.environ.get("USER") or os.environ.get("LOGNAME") or "davide"
     problemi, righe = [], []

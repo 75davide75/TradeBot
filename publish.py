@@ -22,7 +22,8 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 
-from core import BASE, JOURNAL_FILE, STATE_FILE, load_config
+from core import (BASE, JOURNAL_FILE, STATE_FILE, ha_operato, load_config,
+                  migra_se_serve)
 
 CFG = load_config()
 DOCS = os.path.join(BASE, "docs")
@@ -94,6 +95,20 @@ def git(*args) -> tuple:
 
 
 def main():
+    # Anche qui, non solo in bot.py: publish gira da un timer suo ogni 30
+    # minuti e puo' benissimo partire prima del bot dopo un aggiornamento.
+    # Senza questa riga non troverebbe lo stato nella nuova posizione e
+    # pubblicherebbe un data.json vuoto, committandolo.
+    migra_se_serve()
+
+    # Se lo stato manca ma il journal dice che abbiamo operato, NON pubblicare:
+    # un data.json vuoto sovrascriverebbe la dashboard con "capitale 100, zero
+    # posizioni", cioe' una bugia, e la committerebbe pure.
+    if not os.path.exists(STATE_FILE) and ha_operato():
+        print(f"STOP: {STATE_FILE} non esiste ma il journal contiene operazioni.")
+        print("      Non pubblico: sovrascriverei la dashboard con dati vuoti.")
+        sys.exit(1)
+
     os.makedirs(DOCS, exist_ok=True)
     dati = costruisci()
     with open(DATA, "w") as f:

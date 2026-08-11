@@ -27,7 +27,8 @@ import numpy as np
 import pandas as pd
 
 from core import (JOURNAL_FILE, REPORT_DIR, equity, fetch_ohlc, fetch_price,
-                  load_config, load_state, realized_vol, target_leverage)
+                  load_config, load_state, migra_se_serve, realized_vol,
+                  target_leverage)
 
 CFG = load_config()
 
@@ -44,6 +45,7 @@ def send(text: str):
 
 
 def main():
+    migra_se_serve()      # puo' partire prima del bot dopo un aggiornamento
     os.makedirs(REPORT_DIR, exist_ok=True)
     state = load_state(CFG)
     today = datetime.now(timezone.utc).date()
