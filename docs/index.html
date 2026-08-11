@@ -30,6 +30,10 @@ button:hover{background:#22262e;border-color:#3a3f4a}
 button.on{background:rgba(38,166,154,.14);border-color:rgba(38,166,154,.5);color:#4dd0c4}
 button.attesa{background:rgba(227,179,65,.12);border-color:rgba(227,179,65,.45);color:#d9b45a}
 button.ko{background:rgba(239,83,80,.12);border-color:rgba(239,83,80,.45);color:#f08a88}
+.btnlink{font-size:13px;font-weight:500;color:var(--dim);text-decoration:none;
+     background:transparent;border:1px solid var(--line2);border-radius:8px;
+     padding:8px 14px;transition:.15s;white-space:nowrap}
+.btnlink:hover{background:var(--surf2);color:var(--txt);border-color:#3a3f4a;text-decoration:none}
 .dot{width:7px;height:7px;border-radius:50%;background:var(--faint)}
 button.on .dot{background:var(--up);animation:puls 1.6s ease-in-out infinite}
 button.attesa .dot{background:var(--warn);animation:puls .9s ease-in-out infinite}
@@ -100,6 +104,7 @@ a{color:#6b9fe8;text-decoration:none}a:hover{text-decoration:underline}
     <div class="sub" id="sub">caricamento…</div>
   </div>
   <div class="ctrl">
+    <a class="btnlink" href="ricerca.html">Report tecnico</a>
     <button id="live"><span class="dot"></span><span id="livetxt">Avvia live</span></button>
     <button id="rel">Ricarica</button>
   </div>
@@ -238,6 +243,7 @@ function render(){
   document.getElementById('ft').innerHTML=
    `Paper trading — nessun capitale reale impiegato. Lo stato del portafoglio arriva dal Raspberry Pi, aggiornato ogni 30 minuti.<br>
     Candele orarie da Kraken spot USD (di riserva Bybit); col tasto <b>Avvia live</b> i prezzi passano al mark price dei perpetui Kraken Futures via WebSocket, quello stesso su cui il bot calcola le posizioni.<br>
+    <a href="ricerca.html">Report tecnico: day trading, IA e cosa abbiamo misurato</a> ·
     <a href="https://github.com/75davide75/TradeBot">github.com/75davide75/TradeBot</a>`;
 }
 

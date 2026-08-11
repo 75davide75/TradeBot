@@ -1,0 +1,508 @@
+<!DOCTYPE html><html lang="it"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TradeBot — Ricerca: day trading, IA e cosa abbiamo misurato</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0b0d; --surf:#131519; --surf2:#1a1d23; --line:#23262d; --line2:#2d313a;
+  --txt:#e8eaed; --dim:#a8adb5; --faint:#7c828b;
+  --up:#26a69a; --down:#ef5350; --accent:#3b82f6; --warn:#e3b341;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--txt);font:16px/1.7 Inter,-apple-system,sans-serif;
+     -webkit-font-smoothing:antialiased}
+.wrap{max-width:820px;margin:0 auto;padding:40px 22px 100px}
+.mono{font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums}
+
+.top{display:flex;align-items:center;justify-content:space-between;gap:16px;
+     flex-wrap:wrap;padding-bottom:22px;border-bottom:1px solid var(--line);margin-bottom:34px}
+.back{font-size:13.5px;color:#6b9fe8;text-decoration:none}
+.back:hover{text-decoration:underline}
+h1{font-size:30px;font-weight:700;letter-spacing:-.02em;line-height:1.25;margin-bottom:12px}
+.occhiello{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+     color:#7ba9f5;margin-bottom:14px}
+.sommario{font-size:17px;color:var(--dim);line-height:1.65;margin-bottom:8px}
+.data{font-size:12.5px;color:var(--faint);margin-top:18px}
+
+h2{font-size:21px;font-weight:600;letter-spacing:-.01em;margin:52px 0 16px;
+   padding-top:26px;border-top:1px solid var(--line)}
+h3{font-size:16.5px;font-weight:600;margin:30px 0 10px;color:var(--txt)}
+p{margin-bottom:15px}
+ul,ol{margin:0 0 16px 22px}li{margin-bottom:7px}
+a{color:#6b9fe8;text-decoration:none}a:hover{text-decoration:underline}
+strong{font-weight:600;color:#fff}
+em{color:var(--dim)}
+
+.toc{background:var(--surf);border:1px solid var(--line);border-radius:12px;
+     padding:20px 24px;margin-bottom:14px}
+.toc div{font-size:11.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;
+     color:var(--faint);margin-bottom:12px}
+.toc ol{margin:0 0 0 20px;font-size:14.5px}
+.toc li{margin-bottom:5px}
+
+table{width:100%;border-collapse:collapse;font-size:14px;margin:20px 0}
+th{text-align:left;padding:10px 12px;color:var(--faint);font-weight:500;font-size:11.5px;
+   letter-spacing:.04em;text-transform:uppercase;border-bottom:1px solid var(--line2)}
+td{padding:9px 12px;border-bottom:1px solid rgba(35,38,45,.7);vertical-align:top}
+tr:last-child td{border-bottom:0}
+td.n,th.n{text-align:right;font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums}
+.up{color:var(--up)}.down{color:var(--down)}
+.tabellabox{overflow-x:auto;-webkit-overflow-scrolling:touch;
+     background:var(--surf);border:1px solid var(--line);border-radius:12px;padding:4px 8px;margin:20px 0}
+.tabellabox table{margin:0}
+
+.nota{border-left:3px solid var(--accent);background:rgba(59,130,246,.06);
+      padding:14px 18px;margin:22px 0;border-radius:0 8px 8px 0;font-size:15px}
+.attenzione{border-left-color:var(--warn);background:rgba(227,179,65,.07)}
+.chiave{border-left-color:var(--up);background:rgba(38,166,154,.07)}
+.nota .et{display:block;font-size:11px;font-weight:600;letter-spacing:.08em;
+      text-transform:uppercase;color:var(--faint);margin-bottom:6px}
+
+pre{background:#0f1114;border:1px solid var(--line);border-radius:8px;padding:14px 16px;
+    overflow-x:auto;font-family:'JetBrains Mono',monospace;font-size:12.5px;line-height:1.6;
+    color:var(--dim);margin:18px 0}
+
+.fonti{font-size:13.5px;color:var(--dim)}
+.fonti li{margin-bottom:11px}
+footer{margin-top:60px;padding-top:24px;border-top:1px solid var(--line);
+       color:var(--faint);font-size:13px;line-height:1.75}
+@media(max-width:640px){
+  .wrap{padding:26px 16px 70px}h1{font-size:24px}h2{font-size:19px}body{font-size:15.5px}
+}
+</style></head><body>
+<div class="wrap">
+
+<div class="top">
+  <a class="back" href="./">← torna alla dashboard</a>
+  <span class="mono" style="font-size:12px;color:var(--faint)">TradeBot · paper trading</span>
+</div>
+
+<div class="occhiello">Report tecnico</div>
+<h1>Day trading, intelligenza artificiale e cosa abbiamo effettivamente misurato</h1>
+<p class="sommario">Una rassegna delle evidenze pubblicate sulla redditività del trading di brevissimo
+periodo e sull'uso dell'IA nei mercati, messa a confronto con i risultati prodotti da questo
+sistema sui suoi dati reali. Il documento nasce da una domanda precisa — <em>si possono fare
+15 € a settimana partendo da 100 €?</em> — e riporta la risposta con i conti che la sostengono.</p>
+<p class="data mono">Redatto l'11 agosto 2026 · dati: 57 mercati perpetui Kraken, 279 giorni,
+112 giorni out-of-sample</p>
+
+<div class="toc">
+  <div>Indice</div>
+  <ol>
+    <li><a href="#p1">La domanda di partenza e la sua aritmetica</a></li>
+    <li><a href="#p2">Cosa dicono i dati sul day trading</a></li>
+    <li><a href="#p3">L'intelligenza artificiale nei mercati</a></li>
+    <li><a href="#p4">Cosa abbiamo misurato noi</a></li>
+    <li><a href="#p5">Un guasto che invalidava tutte le misure</a></li>
+    <li><a href="#p6">Si può replicare il day trading, automatizzandolo?</a></li>
+    <li><a href="#p7">Conclusioni operative</a></li>
+    <li><a href="#fonti">Fonti</a></li>
+  </ol>
+</div>
+
+<h2 id="p1">1. La domanda di partenza e la sua aritmetica</h2>
+
+<p>L'obiettivo iniziale era <strong>15 € a settimana partendo da 100 €</strong>, in modo
+consistente. Poi ridotto a 5 €. Prima di qualunque considerazione sulla strategia, conviene
+guardare cosa significano quei numeri.</p>
+
+<div class="tabellabox"><table>
+<thead><tr><th>Obiettivo</th><th class="n">Settimanale</th><th class="n">Annuo composto</th><th class="n">100 € dopo 1 anno</th><th class="n">dopo 5 anni</th></tr></thead>
+<tbody>
+<tr><td>15 € a settimana</td><td class="n">15,0%</td><td class="n down">+143.200%</td><td class="n">143.300 €</td><td class="n">6 × 10<sup>15</sup> €</td></tr>
+<tr><td>5 € a settimana</td><td class="n">5,0%</td><td class="n down">+1.164%</td><td class="n">1.264 €</td><td class="n">32.300.000 €</td></tr>
+<tr><td>Medallion (Renaissance), lordo</td><td class="n">~1,0%</td><td class="n up">~66%</td><td class="n">166 €</td><td class="n">1.260 €</td></tr>
+<tr><td>S&amp;P 500, media storica</td><td class="n">~0,19%</td><td class="n up">~10%</td><td class="n">110 €</td><td class="n">161 €</td></tr>
+</tbody></table></div>
+
+<p>Il 5% settimanale composto porta 100 € a 32 milioni in cinque anni. Il miglior track record
+documentato della storia della finanza — il fondo Medallion, con decenni di lavoro di
+matematici e fisici e un vantaggio infrastrutturale enorme — sta a circa l'1% settimanale.</p>
+
+<div class="nota chiave"><span class="et">Il punto</span>
+Un rendimento richiesto non è una preferenza, è un vincolo fisico. Se un metodo producesse il
+5% settimanale in modo consistente, chi lo possiede possiederebbe l'intero mercato nel giro di
+pochi anni. L'assenza di persone in quella condizione è essa stessa la prova.</div>
+
+<h2 id="p2">2. Cosa dicono i dati sul day trading</h2>
+
+<p>La domanda successiva era legittima: esistono persone che aprono e chiudono posizioni in
+poche ore, con leva, e guadagnano molto. Se esistono, perché non replicarle? La letteratura su
+questo punto è insolitamente ampia e insolitamente concorde.</p>
+
+<h3>Brasile — lo studio più netto</h3>
+<p>Chague, De-Losso e Giovannetti hanno seguito <strong>19.646 persone</strong> che hanno
+iniziato a fare day trading sui futures azionari brasiliani tra il 2013 e il 2015 — il terzo
+mercato al mondo per volume. Isolando chi ha <em>insistito almeno 300 giorni</em>, cioè chi
+ci ha davvero provato sul serio:</p>
+<ul>
+<li>il <strong>97% ha perso denaro</strong>;</li>
+<li>lo <strong>0,4%</strong> ha guadagnato più di un impiegato di banca (circa 54 $ al giorno);</li>
+<li>il migliore in assoluto guadagnava 310 $ al giorno, con una deviazione standard di 2.560 $
+— cioè oscillazioni otto volte più grandi del guadagno medio.</li>
+</ul>
+<p>Gli autori non hanno trovato <strong>alcuna evidenza di apprendimento</strong>: l'esperienza
+accumulata non migliorava i risultati. Questo è il dato che smonta l'idea del "devo solo
+imparare meglio".</p>
+
+<h3>Taiwan — quindici anni di dati completi</h3>
+<p>Barber, Lee, Liu e Odean hanno analizzato l'intero mercato azionario taiwanese dal 1992 al
+2006, avendo accesso a tutte le transazioni. I day trader in profitto sono l'<strong>1,6% in
+un anno medio</strong>. Sulla persistenza:</p>
+<ul>
+<li>circa il <strong>40%</strong> fa day trading per un solo mese;</li>
+<li>l'<strong>80% smette entro due anni</strong>;</li>
+<li>dopo tre anni continua il <strong>13%</strong>, dopo cinque il <strong>7%</strong>.</li>
+</ul>
+
+<h3>Europa — i dati dei regolatori</h3>
+<p>Le autorità nazionali europee, analizzando i conti CFD, hanno rilevato che
+<strong>tra il 74% e l'89% dei conti retail perde denaro</strong>, con perdite medie per cliente
+tra 1.600 € e 29.000 €. Sono questi numeri che hanno portato ESMA nel 2018 a limitare la leva
+retail (fino a 30:1 sulle coppie principali, 2:1 sulle crypto), a imporre la protezione dal
+saldo negativo e a obbligare i broker a scrivere in home page la percentuale dei propri
+clienti in perdita.</p>
+
+<div class="nota attenzione"><span class="et">Da notare</span>
+Quella percentuale obbligatoria è un dato pubblico e verificabile: la si legge sul sito di
+qualunque broker CFD regolamentato in Europa. È il settore stesso a dichiararla.</div>
+
+<h3>Prop firm — l'industria dei conti finanziati</h3>
+<p>Il modello "supera la sfida e ti finanziamo" produce statistiche coerenti con le precedenti:
+il tasso di superamento medio è <strong>5–10%</strong>, e solo circa il <strong>7% di chi
+acquista una challenge riceve mai un pagamento</strong>. Chi resta finanziato e preleva con
+continuità oltre i sei mesi si colloca tra l'<strong>1% e il 3%</strong>.</p>
+
+<h3>Perché allora se ne vedono tanti che guadagnano</h3>
+<p>Il meccanismo è la selezione dei sopravvissuti, ed è quantificabile con i dati prodotti da
+questo stesso progetto. Dal backtest in <code>RISULTATI.md</code>, stessa strategia a leve
+diverse:</p>
+
+<div class="tabellabox"><table>
+<thead><tr><th>Leva</th><th class="n">Rend. medio</th><th class="n">Rend. mediano</th><th class="n">Conti liquidati</th></tr></thead>
+<tbody>
+<tr><td>0,5x</td><td class="n">−4,0%</td><td class="n">−5,3%</td><td class="n">0%</td></tr>
+<tr><td>1x</td><td class="n">−12,0%</td><td class="n">−15,4%</td><td class="n">0%</td></tr>
+<tr><td>2x</td><td class="n">−40,4%</td><td class="n">−43,3%</td><td class="n">17%</td></tr>
+<tr><td>3x</td><td class="n">−74,5%</td><td class="n">−84,0%</td><td class="n down">44%</td></tr>
+<tr><td>5x</td><td class="n">−99,0%</td><td class="n">−100,0%</td><td class="n down">89%</td></tr>
+<tr><td>10x</td><td class="n">−100,0%</td><td class="n">−100,0%</td><td class="n down">100%</td></tr>
+</tbody></table></div>
+
+<p>A leva 5x l'89% dei conti si azzera. Ma alcune configurazioni mostravano perfino uno
+<strong>Sharpe positivo (+0,35) con rendimento mediano −100%</strong>. Il meccanismo è tutto
+lì: su mille persone a leva alta, ottocentonovanta spariscono in silenzio — nessuno pubblica lo
+screenshot del conto azzerato — e le centodieci rimaste hanno numeri spettacolari, alcune
+davvero per mesi. Quelle pubblicano, e spesso vendono il corso. Sono le uniche visibili.</p>
+
+<div class="nota"><span class="et">Formulazione precisa</span>
+La media descrive mille universi paralleli. Tu ne vivi uno solo. Una scommessa con valore
+atteso positivo può rovinare con quasi-certezza chi la ripete con dimensionamento sbagliato,
+perché <strong>la liquidazione è assorbente</strong>: da zero non si torna indietro.</div>
+
+<h2 id="p3">3. L'intelligenza artificiale nei mercati</h2>
+
+<p>La domanda naturale è se l'IA cambi il quadro. La risposta breve: è uno strumento reale, con
+un vantaggio misurabile in laboratorio, che finora non si è tradotto in rendimenti superiori
+per chi lo usa.</p>
+
+<h3>Il machine learning funziona davvero, in laboratorio</h3>
+<p>Gu, Kelly e Xiu (<em>Empirical Asset Pricing via Machine Learning</em>, Review of Financial
+Studies) hanno confrontato metodi di machine learning contro modelli lineari su oltre 900
+segnali predittivi. Le reti neurali hanno prodotto portafogli long-short con
+<strong>Sharpe 1,35</strong> (pesati per capitalizzazione) e <strong>2,45</strong>
+(equipesati), contro 0,61 e 0,83 dei modelli lineari. Il risultato è solido e replicato.</p>
+<p>Due dettagli che contano più del titolo: i metodi concordano tutti sugli stessi pochi
+segnali dominanti — <em>momentum, liquidità, volatilità</em>, cioè fattori noti da decenni — e
+il modello lineare esteso a 900 predittori <strong>va in overfitting catastrofico</strong>
+(R² fuori campione negativo). La potenza serve a non annegare nei dati, non a scoprire una
+verità nuova.</p>
+
+<h3>Ma i fondi che lo usano non hanno battuto un indice</h3>
+<p>Dal dicembre 2009 al luglio 2024 l'indice Eurekahedge dei fondi hedge basati su IA ha reso
+il <strong>9,8% annualizzato contro il 13,7% dell'S&amp;P 500</strong>. E il dettaglio più
+istruttivo: la performance relativa è stata <strong>migliore nella prima metà del campione che
+nella seconda</strong>, il contrario di quanto ci si aspetterebbe se questi sistemi
+migliorassero imparando.</p>
+
+<h3>Il vantaggio pubblicato evapora</h3>
+<p>McLean e Pontiff hanno seguito 97 anomalie documentate in letteratura. I rendimenti risultano
+<strong>26% più bassi fuori campione</strong> e <strong>58% più bassi dopo la
+pubblicazione</strong>. La differenza tra i due numeri — circa 32 punti — è attribuibile a
+operatori che leggono la ricerca e la sfruttano fino a consumarla. Un segnale noto smette di
+essere un segnale.</p>
+
+<h3>L'overfitting da backtest è la malattia professionale del settore</h3>
+<p>Bailey, Borwein, López de Prado e Zhu hanno formalizzato il problema: <em>provando abbastanza
+configurazioni, un backtest può essere adattato a qualunque risultato desiderato</em>. Da qui
+il concetto di lunghezza minima del backtest in funzione del numero di tentativi, e la
+<em>probability of backtest overfitting</em>. La loro conclusione mette in dubbio buona parte
+delle strategie pubblicate su riviste accademiche.</p>
+
+<h3>I modelli linguistici hanno un problema in più</h3>
+<p>Gli LLM sono addestrati su testo storico, quindi possono <em>ricordare</em> ciò che sarebbe
+dovuto essere ignoto alla data della previsione. La ricerca ha documentato casi estremi di
+questo look-ahead bias, fino a correlazioni prossime al 100% su rendimenti annuali dell'S&amp;P
+500 — che non è capacità predittiva, è memoria. Chiedere a un modello linguistico cosa farà un
+prezzo produce backtest brillanti e risultati reali nulli.</p>
+
+<div class="nota attenzione"><span class="et">Il nostro caso, in diretta</span>
+Durante questa stessa analisi abbiamo prodotto un segnale con <strong>Sharpe 3,75</strong> e
+intervallo di confidenza sopra lo zero. Sembrava una scoperta. Non lo era: vedi la sezione
+successiva. È esattamente il fenomeno che López de Prado descrive, osservato su noi stessi
+nel giro di un pomeriggio.</div>
+
+<h2 id="p4">4. Cosa abbiamo misurato noi</h2>
+
+<p>Dati: 57 mercati perpetui Kraken, prezzi giornalieri e <em>funding rate reali</em>, 279
+giorni complessivi, 112 dei quali fuori campione. Parametri scelti sul primo 60%, misurati sul
+restante 40% mai visto.</p>
+
+<h3>Una correzione preliminare: i costi erano sottostimati di circa metà</h3>
+<p>Il motore di test precedente addebitava solo la commissione (0,05% per lato). Lo spread
+denaro-lettera non era modellato. Misurato sui 57 mercati:</p>
+<ul>
+<li>spread mediano <strong>0,057%</strong>, medio <strong>0,103%</strong>;</li>
+<li>massimo <strong>1,279%</strong> (MUBARAK);</li>
+<li>costo reale per giro completo sul mercato mediano: <strong>0,157%</strong>, non 0,10%.</li>
+</ul>
+
+<h3>Sei segnali, con i costi veri</h3>
+<p>Ai tre già testati sono stati aggiunti due segnali <em>cross-sectional</em> — che classificano
+i mercati fra loro e sono neutrali al mercato per costruzione, non per sottrazione a posteriori
+— e un momentum a orizzonti multipli.</p>
+
+<div class="tabellabox"><table>
+<thead><tr><th>Segnale</th><th class="n">Rend. annuo</th><th class="n">Sharpe</th><th class="n">IC 95%</th><th class="n">Costi/anno</th></tr></thead>
+<tbody>
+<tr><td>momentum (time-series)</td><td class="n down">−6,7%</td><td class="n">−0,25</td><td class="n">[−3,02, +2,61]</td><td class="n">5,1%</td></tr>
+<tr><td>carry (time-series)</td><td class="n">+50,6%</td><td class="n">+2,28</td><td class="n">[−1,11, +6,28]</td><td class="n">11,4%</td></tr>
+<tr><td>momentum cross-sectional</td><td class="n down">−3,2%</td><td class="n">−0,13</td><td class="n">[−3,27, +2,78]</td><td class="n">8,3%</td></tr>
+<tr><td><strong>carry cross-sectional</strong></td><td class="n up">+67,6%</td><td class="n up">+3,75</td><td class="n up">[+0,37, +7,30]</td><td class="n">9,7%</td></tr>
+<tr><td>carry con freno</td><td class="n">+30,5%</td><td class="n">+0,87</td><td class="n">[−2,52, +5,20]</td><td class="n">16,3%</td></tr>
+<tr><td>momentum multi-orizzonte</td><td class="n">+2,0%</td><td class="n">+0,06</td><td class="n">[−3,76, +3,56]</td><td class="n">12,9%</td></tr>
+</tbody></table></div>
+
+<p>Un solo candidato con l'intervallo sopra lo zero. È lì che è cominciato il lavoro vero.</p>
+
+<h3>Smontaggio del candidato</h3>
+<p><strong>Prova 1 — regge senza i giorni migliori?</strong> Su 112 giorni fuori campione il
+carry cross-sectional rende +22,4%. Togliendo i 10 migliori: <strong>−1,0%</strong>. Il 71%
+del guadagno arriva da 5 giorni.</p>
+
+<p><strong>Prova 2 — da dove vengono quei giorni?</strong></p>
+<pre>2026-07-22  DEXE   −18,62%  di funding in un giorno
+2026-07-23  DEXE   −16,79%
+2026-07-21  DEXE   −11,11%
+2026-07-26  DEXE   −10,43%
+2026-08-07  ACE     −7,98%
+2026-07-24  DEXE    −7,90%</pre>
+<p>Un singolo mercato illiquido, in una singola settimana. Il contributo per mercato conferma:
+BICO 23%, ACE 10%, RIVER 9% — tutti nella coda illiquida.</p>
+
+<p><strong>Prova 3 — sopravvive sull'universo negoziabile?</strong> Con un conto piccolo non si
+opera su un mercato con l'1,28% di spread. Filtrando ai 43 mercati con spread sotto lo 0,10%,
+il carry cross-sectional passa da Sharpe 3,75 a 2,74 e <strong>l'intervallo di confidenza torna
+a contenere lo zero</strong>: [−0,71, +6,73].</p>
+
+<div class="nota attenzione"><span class="et">Un errore, riportato per intero</span>
+La prima versione del "carry con freno" dava <strong>+129,6% annuo</strong>. Era un bug: i
+mercati venivano filtrati e <em>poi</em> i pesi rinormalizzati. Rinormalizzare dopo il filtro
+distrugge la neutralità — l'esposizione netta era salita a +0,22 — e concentra il portafoglio
+su 6 mercati con pesi fino al 13%. Quel rendimento era concentrazione e direzione, non segnale.
+Corretto l'ordine delle operazioni, la stessa strategia scende a +30,5% con Sharpe 0,87.
+È il modo tipico in cui nascono le strategie miracolose: non per disonestà, ma per un errore
+di costruzione che spinge il risultato nella direzione sperata, dove nessuno lo va a
+controllare.</div>
+
+<h3>La configurazione realmente in esecuzione</h3>
+<p>Simulando gli 8 mercati effettivamente operati, momentum a 60 giorni, volatility targeting
+al 20%, cap di leva 2,0, con i costi reali:</p>
+
+<div class="tabellabox"><table>
+<thead><tr><th>Misura</th><th class="n">Valore</th><th class="n">In euro su 100 €</th></tr></thead>
+<tbody>
+<tr><td>Rendimento walk-forward (fuori campione)</td><td class="n">+15,6% annuo</td><td class="n">+15,60 €/anno</td></tr>
+<tr><td>Equivalente settimanale</td><td class="n">+0,29%</td><td class="n up">+0,29 €</td></tr>
+<tr><td>Scenario sfortunato (5° percentile)</td><td class="n">−2,4%</td><td class="n down">−2,39 €</td></tr>
+<tr><td>Scenario fortunato (95° percentile)</td><td class="n">+51,3%</td><td class="n up">+51,31 €</td></tr>
+<tr><td>Sharpe fuori campione</td><td class="n">+1,04</td><td class="n">IC [−2,49, +4,04]</td></tr>
+<tr><td>Senza i 10 giorni migliori</td><td class="n down">−9,8%</td><td class="n">—</td></tr>
+<tr><td colspan="3" style="color:var(--faint);font-size:13px">Per riferimento: comprare e tenere gli 8 mercati nello stesso periodo ha reso −51,1% (100 € → 48,86 €)</td></tr>
+</tbody></table></div>
+
+<h3>Il parametro è su un picco isolato</h3>
+<p>Il valore <code>momentum_n = 60</code> presente in configurazione è il migliore dei sette
+provati, e i suoi vicini immediati sono in perdita:</p>
+
+<div class="tabellabox"><table>
+<thead><tr><th class="n">n = 10</th><th class="n">20</th><th class="n">30</th><th class="n">45</th><th class="n">60</th><th class="n">90</th><th class="n">120</th></tr></thead>
+<tbody><tr>
+<td class="n down">−9,8%</td><td class="n">+1,1%</td><td class="n down">−11,1%</td><td class="n">+5,9%</td>
+<td class="n up"><strong>+19,2%</strong></td><td class="n down">−3,2%</td><td class="n">+10,1%</td>
+</tr></tbody></table></div>
+
+<p>Un parametro che cattura un effetto reale degrada dolcemente: 45 e 90 dovrebbero rendere
+quasi quanto 60. Un picco circondato da perdite è la firma di un parametro fortunato. La media
+su tutti e sette è <strong>+1,7% annuo</strong>, ed è probabilmente la stima più onesta.</p>
+
+<h2 id="p5">5. Un guasto che invalidava tutte le misure</h2>
+
+<p>Durante l'analisi è emerso che lo stato del sistema si azzerava durante i deploy.
+Ricostruendo la cronologia dai commit pubblicati dal Raspberry Pi ogni 30 minuti:</p>
+
+<div class="tabellabox"><table>
+<thead><tr><th>Data e ora (UTC)</th><th class="n">Storico equity</th><th class="n">Posizioni</th><th class="n">Equity</th></tr></thead>
+<tbody>
+<tr><td>10/08/2026 19:39</td><td class="n">32 punti → 1</td><td class="n">3 → 0</td><td class="n">19,84 € → 100,00 €</td></tr>
+<tr><td>11/08/2026 11:18</td><td class="n down">74 punti → 1</td><td class="n down">8 → 0</td><td class="n">100,40 € → 100,00 €</td></tr>
+</tbody></table></div>
+
+<p>Il secondo azzeramento è avvenuto <strong>25 secondi</strong> dopo il salvataggio dei file di
+codice sulla macchina di sviluppo. La causa a monte era una procedura di deploy che copiava
+l'intera cartella, file di stato compreso, resa necessaria dal fatto che lo script di sincronia
+"sicuro" usava una lista esplicita di file rimasta indietro rispetto al progetto.</p>
+
+<p>Il guasto era invisibile perché il controllo di salute verificava che lo stato fosse
+<em>recente</em>, e uno stato appena azzerato è recentissimo: il messaggio del mattino
+riportava <em>"tutto in ordine"</em> mentre lo storico spariva.</p>
+
+<div class="nota chiave"><span class="et">Risolto</span>
+I dati sono stati spostati fuori dalla cartella del codice; il bot si rifiuta di ripartire da
+zero se trova il journal ma non lo stato; il controllo di salute confronta la continuità e non
+solo la freschezza. Dodici test automatici coprono i casi, incluso lo scenario esatto
+dell'11 agosto.</div>
+
+<p>Rilevanza per questo report: <strong>tutte le misure di rendimento raccolte prima di questa
+correzione sono inutilizzabili</strong>, perché il capitale ripartiva periodicamente da 100 €.
+È il motivo per cui i numeri della sezione 4 vengono da backtest e non dal registro live.</p>
+
+<h2 id="p6">6. Si può replicare il day trading, automatizzandolo?</h2>
+
+<p>La domanda merita una risposta articolata, perché la risposta cambia a seconda di cosa si
+intende.</p>
+
+<h3>Automatizzare il day trading discrezionale: no, e l'automazione non aiuta</h3>
+<p>L'automazione elimina gli errori emotivi — entrare per noia, raddoppiare sulle perdite,
+chiudere i vincitori troppo presto. Sono errori reali e toglierli ha valore. Ma non tocca le
+due cause vere delle statistiche della sezione 2: <strong>la struttura dei costi</strong> e
+<strong>l'assenza di un vantaggio</strong>. Un sistema automatico senza vantaggio perde con più
+disciplina e più regolarità di un umano senza vantaggio. Anzi: opera più spesso, quindi paga
+più costi.</p>
+
+<h3>Le strategie di brevissimo che funzionano davvero: sì, ma non sono accessibili</h3>
+<p>Esistono operatori che guadagnano in modo sistematico su orizzonti di minuti o secondi. Fanno
+essenzialmente due cose: <em>market making</em> (guadagnare lo spread fornendo liquidità) e
+<em>arbitraggio di latenza</em> (sfruttare disallineamenti di prezzo per frazioni di secondo).
+Entrambe sono corse tecnologiche, non intellettuali. I dati di settore indicano colocation
+istituzionale attorno ai 12.000 $ al mese, infrastruttura FPGA circa 50.000 $ l'anno, e stime
+di 5–20 milioni per competere sul nanosecondo nel crypto entro pochi anni. Il vantaggio è
+fisico: metri di cavo in meno verso il motore di matching.</p>
+<p>Un Raspberry Pi che interroga un'API pubblica non è in quella gara, e nessuna quantità di
+codice lo mette in gara.</p>
+
+<h3>L'eccezione onesta: il carry delta-neutral</h3>
+<p>C'è una strategia di breve periodo, documentata e non mitologica, accessibile senza
+infrastruttura speciale: incassare il <em>funding rate</em> dei perpetui restando neutrali al
+prezzo (short perpetuo + long spot). I dati di settore per il 2025 indicano rendimenti attorno
+al <strong>12–19% annuo con drawdown sotto il 2%</strong>, in compressione verso la singola
+cifra alta nel 2026 man mano che aumenta il capitale istituzionale.</p>
+<p>È realmente interessante, e conferma che il segnale carry visto nella sezione 4 non è una
+fantasia. Ma due vincoli lo rendono non applicabile qui:</p>
+<ol>
+<li><strong>Serve la gamba spot.</strong> Il conto delta-neutral vero era già stato fatto in
+<code>TEST_PERPETUI.md</code>: con le commissioni spot (0,40%, non 0,05%) il risultato scende a
+<strong>+2,87% netto</strong>, quanto un conto deposito.</li>
+<li><strong>Su 100 € i costi fissi dominano.</strong> Con circa 12,50 € per posizione, lo spread
+e le commissioni assorbono un margine che si misura in decimi di punto.</li>
+</ol>
+<p>E anche nella versione migliore, 12–19% annuo su 100 € fa <strong>1,20–1,90 € al
+mese</strong>. Reale, documentato, e lontanissimo dai 5 € a settimana.</p>
+
+<h3>Riepilogo della risposta</h3>
+<div class="tabellabox"><table>
+<thead><tr><th>Approccio</th><th>Reale?</th><th>Accessibile?</th><th class="n">Ordine di grandezza</th></tr></thead>
+<tbody>
+<tr><td>Day trading discrezionale a leva</td><td>No come fonte di reddito</td><td>Sì</td><td class="n down">97% perde</td></tr>
+<tr><td>Market making / arbitraggio di latenza</td><td class="up">Sì</td><td>No (milioni di infrastruttura)</td><td class="n">—</td></tr>
+<tr><td>Carry delta-neutral</td><td class="up">Sì</td><td>Parzialmente</td><td class="n">+3% netto su spot Kraken</td></tr>
+<tr><td>Trend following a bassa frequenza</td><td>Incerto</td><td class="up">Sì</td><td class="n">≈ 0%, IC contiene zero</td></tr>
+</tbody></table></div>
+
+<h2 id="p7">7. Conclusioni operative</h2>
+
+<ol>
+<li><strong>L'obiettivo di rendimento va abbandonato, non ridotto.</strong> Un obiettivo fisso
+su un mercato che non lo conosce produce un solo comportamento: alzare il rischio quando si
+resta indietro. È il meccanismo con cui i conti si azzerano, ed è il motivo per cui
+<code>target_leverage()</code> reagisce alla volatilità e mai ai profitti recenti.</li>
+
+<li><strong>Il vincolo è il capitale, non il codice.</strong> Con un rendimento eccellente e
+sostenuto del 30% annuo, 100 € producono 30 € l'anno. Nessuna strategia cambia questo ordine di
+grandezza; solo il capitale lo fa. Il che, in assenza di un vantaggio dimostrato, non è una
+raccomandazione ad aggiungerne.</li>
+
+<li><strong>Il valore prodotto finora non è un rendimento, è un metodo.</strong> Questo progetto
+ha misurato, con costi realistici e validazione fuori campione, che quattro famiglie di
+strategie classiche non hanno vantaggio, che il rollover del margine era il vero killer, e che
+un candidato promettente era una settimana anomala su un mercato illiquido. Sono informazioni
+che di norma si comprano perdendo denaro.</li>
+
+<li><strong>Il prossimo passo è temporale, non algoritmico.</strong> Con la persistenza dello
+stato risolta, sei mesi di dati raccolti in avanti diranno qualcosa che nessun backtest su 112
+giorni può dire. È lento e non si può accelerare: è la definizione stessa di prova che non si
+può curvare.</li>
+</ol>
+
+<div class="nota chiave"><span class="et">La misura del successo</span>
+Per un sistema come questo il criterio di riuscita non è "quanto guadagna", è
+<strong>"quanto è affidabile ciò che dichiara"</strong>. Un bot che dice onestamente di non
+avere vantaggio vale più di uno che mostra una curva in salita costruita su un bug.</div>
+
+<h2 id="fonti">Fonti</h2>
+<ul class="fonti">
+<li>Chague, De-Losso, Giovannetti, <em>Day Trading for a Living?</em> (2020) —
+<a href="https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3423101">SSRN</a></li>
+<li>Barber, Lee, Liu, Odean, <em>Do Day Traders Rationally Learn About Their Ability?</em> —
+<a href="https://faculty.haas.berkeley.edu/odean/papers/Day%20Traders/Day%20Trading%20and%20Learning%20110217.pdf">UC Berkeley (PDF)</a></li>
+<li>Barber, Lee, Liu, Odean, <em>The Cross-Section of Speculator Skill: Evidence from Day Trading</em> —
+<a href="https://www.sciencedirect.com/science/article/abs/pii/S1386418113000190">ScienceDirect</a></li>
+<li>ESMA, restrizioni su CFD e opzioni binarie per i clienti retail —
+<a href="https://www.esma.europa.eu/press-news/esma-news/esma-agrees-prohibit-binary-options-and-restrict-cfds-protect-retail-investors">esma.europa.eu</a></li>
+<li>Gu, Kelly, Xiu, <em>Empirical Asset Pricing via Machine Learning</em>, Review of Financial Studies —
+<a href="https://dachxiu.chicagobooth.edu/download/ML.pdf">Chicago Booth (PDF)</a></li>
+<li>McLean, Pontiff, <em>Does Academic Research Destroy Stock Return Predictability?</em> —
+<a href="https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2156623">SSRN</a></li>
+<li>Bailey, Borwein, López de Prado, Zhu, <em>Pseudo-Mathematics and Financial Charlatanism</em>,
+Notices of the AMS (2014) —
+<a href="https://www.ams.org/notices/201405/rnoti-p458.pdf">ams.org (PDF)</a></li>
+<li>Bailey, Borwein, López de Prado, Zhu, <em>The Probability of Backtest Overfitting</em> —
+<a href="https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2326253">SSRN</a></li>
+<li><em>Assessing Look-Ahead Bias in Stock Return Predictions Generated by GPT Sentiment Analysis</em> —
+<a href="https://arxiv.org/abs/2309.17322">arXiv</a></li>
+<li>Eurekahedge AI Hedge Fund Index, analisi comparativa —
+<a href="https://www.advisorperspectives.com/articles/2023/07/17/artificial-intelligence-failed-to-outperform-swedroe">Advisor Perspectives</a></li>
+<li>Statistiche prop firm 2026 —
+<a href="https://thepropfirmguide.com/prop-firm-statistics/">The Prop Firm Guide</a></li>
+<li>Infrastruttura e latenza nel trading ad alta frequenza —
+<a href="https://www.quantvps.com/blog/low-latency-trading">QuantVPS</a></li>
+<li>Rendimenti del carry delta-neutral crypto, dati 2025–2026 —
+<a href="https://arbitragescanner.io/blog/crypto-funding-rate-arbitrage-guide">Arbitrage Scanner</a></li>
+</ul>
+
+<p style="font-size:13.5px;color:var(--faint);margin-top:20px">Le fonti di settore (ultime
+quattro) sono meno solide di quelle accademiche: riportano dati commerciali non sottoposti a
+revisione paritaria. Sono usate qui solo per ordini di grandezza su infrastruttura e
+rendimenti correnti, non per conclusioni.</p>
+
+<footer>
+Documento generato a supporto del progetto TradeBot — paper trading, nessun capitale reale
+impiegato. Le analisi originali sono riproducibili con <code>perp_test/ricerca.py</code>.<br>
+Questo documento non è consulenza finanziaria: riporta evidenze pubblicate e misure fatte su
+un sistema simulato.<br>
+<a href="./">← torna alla dashboard</a> ·
+<a href="https://github.com/75davide75/TradeBot">github.com/75davide75/TradeBot</a>
+</footer>
+
+</div></body></html>
