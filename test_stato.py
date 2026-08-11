@@ -169,5 +169,81 @@ class TestCaricamento(unittest.TestCase):
             self.assertTrue(s.ha_operato())
 
 
+class TestCapitale(unittest.TestCase):
+    """
+    Alzare 'capital' in configurazione e' un VERSAMENTO, non un capitale
+    iniziale diverso. Se il denominatore dei rendimenti salisse senza che
+    salga anche la cassa, la dashboard mostrerebbe una perdita mai avvenuta.
+    """
+
+    def _conto_avviato(self, s, cash=100.0, capitale=100.0):
+        st = s.load_state({"capital": capitale})
+        st["cash"] = cash
+        st["history"] = [{"ts": "2026-08-01T00:00:00+00:00", "equity": capitale}]
+        s.save_state(st)
+        return st
+
+    def test_versamento_aumenta_cassa_e_denominatore(self):
+        with tempfile.TemporaryDirectory() as d:
+            s = carica_stato(d)
+            self._conto_avviato(s, cash=97.0, capitale=100.0)
+            st = s.load_state({"capital": 200.0})
+            delta = s.adegua_capitale(st, {"capital": 200.0})
+            self.assertEqual(delta, 100.0)
+            self.assertAlmostEqual(st["cash"], 197.0)
+            self.assertEqual(st["capitale_versato"], 200.0)
+
+    def test_il_rendimento_non_diventa_una_perdita_finta(self):
+        """Il bug che questo test impedisce: 100/200-1 = -50% dal nulla."""
+        with tempfile.TemporaryDirectory() as d:
+            s = carica_stato(d)
+            self._conto_avviato(s, cash=100.0, capitale=100.0)
+            st = s.load_state({"capital": 200.0})
+            s.adegua_capitale(st, {"capital": 200.0})
+            rendimento = st["cash"] / st["capitale_versato"] - 1
+            self.assertAlmostEqual(rendimento, 0.0)
+
+    def test_peak_equity_sale_col_versamento(self):
+        """Altrimenti il kill switch vede un drawdown del 50% e ferma tutto."""
+        with tempfile.TemporaryDirectory() as d:
+            s = carica_stato(d)
+            self._conto_avviato(s, cash=100.0, capitale=100.0)
+            st = s.load_state({"capital": 200.0})
+            prima = st["peak_equity"]
+            s.adegua_capitale(st, {"capital": 200.0})
+            self.assertAlmostEqual(st["peak_equity"], prima + 100.0)
+            dd = st["cash"] / st["peak_equity"] - 1
+            self.assertAlmostEqual(dd, 0.0)
+
+    def test_e_idempotente(self):
+        """Il bot lo chiama a ogni avvio: non deve versare due volte."""
+        with tempfile.TemporaryDirectory() as d:
+            s = carica_stato(d)
+            self._conto_avviato(s, cash=100.0, capitale=100.0)
+            st = s.load_state({"capital": 200.0})
+            self.assertEqual(s.adegua_capitale(st, {"capital": 200.0}), 100.0)
+            self.assertEqual(s.adegua_capitale(st, {"capital": 200.0}), 0.0)
+            self.assertAlmostEqual(st["cash"], 200.0)
+
+    def test_ridurre_il_capitale_non_preleva_da_solo(self):
+        with tempfile.TemporaryDirectory() as d:
+            s = carica_stato(d)
+            self._conto_avviato(s, cash=100.0, capitale=100.0)
+            st = s.load_state({"capital": 50.0})
+            self.assertEqual(s.adegua_capitale(st, {"capital": 50.0}), 0.0)
+            self.assertAlmostEqual(st["cash"], 100.0)
+
+    def test_versamento_finisce_nel_journal(self):
+        with tempfile.TemporaryDirectory() as d:
+            s = carica_stato(d)
+            self._conto_avviato(s, cash=100.0, capitale=100.0)
+            st = s.load_state({"capital": 200.0})
+            s.adegua_capitale(st, {"capital": 200.0})
+            with open(s.JOURNAL_FILE) as f:
+                testo = f.read()
+            self.assertIn("deposit", testo)
+            self.assertIn("100.0", testo)
+
+
 if __name__ == "__main__":
     unittest.main()

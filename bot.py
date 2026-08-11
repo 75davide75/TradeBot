@@ -24,10 +24,10 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 
-from core import (DATA_DIR, StatoPerduto, check_kill_switch, close_position,
-                  equity, fetch_ohlc, fetch_price, journal, load_config,
-                  load_state, migra_se_serve, open_position, order_minimum,
-                  save_state, signal_momentum, target_leverage)
+from core import (DATA_DIR, StatoPerduto, adegua_capitale, check_kill_switch,
+                  close_position, equity, fetch_ohlc, fetch_price, journal,
+                  load_config, load_state, migra_se_serve, open_position,
+                  order_minimum, save_state, signal_momentum, target_leverage)
 
 CFG = load_config()
 API = f"https://api.telegram.org/bot{CFG['telegram_token']}"
@@ -102,8 +102,13 @@ def snapshot(state, eq):
         btc = fetch_price("XXBTZEUR")
     except Exception:
         btc = None
+    # 'versato' viaggia con ogni punto: senza, il confronto con il buy&hold
+    # sarebbe falsato dopo un versamento (il benchmark non avrebbe ricevuto
+    # gli stessi soldi nello stesso momento).
     state["history"].append({"ts": datetime.now(timezone.utc).isoformat(),
-                             "equity": round(eq, 4), "btc": btc})
+                             "equity": round(eq, 4), "btc": btc,
+                             "versato": round(float(state.get(
+                                 "capitale_versato", CFG["capital"])), 4)})
     state["history"] = state["history"][-5000:]
 
 
@@ -373,7 +378,8 @@ def status() -> str:
         except Exception:
             pass
     eq = equity(state, prices)
-    righe = [f"<b>Equity:</b> {eq:.2f} € ({eq / CFG['capital'] - 1:+.1%})",
+    versato = float(state.get("capitale_versato", CFG["capital"]))
+    righe = [f"<b>Equity:</b> {eq:.2f} € ({eq / versato - 1:+.1%} su {versato:.0f} € versati)",
              f"<b>Cash:</b> {state['cash']:.2f} €",
              f"<b>Posizioni:</b> {len(state['positions'])}"]
     for pair, p in state["positions"].items():
@@ -425,6 +431,19 @@ def controlla_stato_allavvio():
 
     if os.path.exists(MARCATORE_ALLARME):
         os.remove(MARCATORE_ALLARME)
+
+    # Se 'capital' e' stato alzato in configurazione, la differenza entra in
+    # cassa come versamento. Cambiare solo il numero senza aggiungere i soldi
+    # farebbe apparire una perdita che non e' mai avvenuta.
+    st = load_state(CFG)
+    delta = adegua_capitale(st, CFG)
+    if delta:
+        save_state(st)
+        send(f"💶 <b>Versamento registrato</b>\n"
+             f"Capitale portato a {st['capitale_versato']:.2f} € "
+             f"(+{delta:.2f} €).\n"
+             f"Cassa ora {st['cash']:.2f} €.\n"
+             f"<i>I rendimenti da qui in poi si calcolano sul nuovo totale.</i>")
 
 
 def main():

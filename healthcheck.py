@@ -82,8 +82,8 @@ def main():
             righe.append("⚠️ nessuno storico ancora registrato")
 
         eq = hist[-1]["equity"] if hist else st.get("cash", 0)
-        cap = CFG["capital"]
-        righe.append(f"💰 equity {eq:.2f} € ({eq/cap-1:+.2%} dal via)")
+        cap = float(st.get("capitale_versato", CFG["capital"]))
+        righe.append(f"💰 equity {eq:.2f} € ({eq/cap-1:+.2%} su {cap:.0f} € versati)")
         righe.append(f"📊 posizioni aperte: {len(st.get('positions', {}))}")
 
         if st.get("halted"):

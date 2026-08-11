@@ -23,8 +23,9 @@ import pandas as pd
 # dove le librerie scientifiche non ci sono. Qui viene riesposta, cosi'
 # 'from core import STATE_FILE' continua a funzionare ovunque.
 from stato import (BASE, CONFIG_FILE, DATA_DIR, JOURNAL_FILE,  # noqa: F401
-                   REPORT_DIR, STATE_FILE, StatoPerduto, blank_state,
-                   ha_operato, journal, load_state, migra_se_serve, save_state)
+                   REPORT_DIR, STATE_FILE, StatoPerduto, adegua_capitale,
+                   blank_state, ha_operato, journal, load_state,
+                   migra_se_serve, save_state)
 
 # Costi Kraken reali, fascia volume piu' bassa
 TAKER_FEE = 0.0040

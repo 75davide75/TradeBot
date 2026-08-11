@@ -101,6 +101,11 @@ def default_stato(cfg: dict) -> dict:
     return {
         "mode": "paper",
         "cash": cap,
+        # Quanto capitale e' stato messo dentro in totale. Diverso da
+        # cfg["capital"], che e' solo il valore di partenza: se domani versi
+        # altri 100 EUR, i rendimenti vanno calcolati su 200, non su 100.
+        # Senza questa distinzione un versamento apparirebbe come una perdita.
+        "capitale_versato": cap,
         "positions": {},
         "peak_equity": cap,
         "halted": False,
@@ -136,6 +141,13 @@ def _con_default(state: dict, cfg: dict) -> dict:
             # non lo e', e il controllo di continuita' urlerebbe a vuoto.
             storia = state.get("history") or []
             v = storia[0].get("ts", v) if storia else v
+        elif k == "capitale_versato":
+            # NON prendere cfg["capital"]: se il capitale e' appena stato
+            # alzato in configurazione, copiarlo qui farebbe sparire il
+            # versamento prima che adegua_capitale possa accorgersene.
+            # Il capitale d'origine e' il primo punto dello storico.
+            storia = state.get("history") or []
+            v = float(storia[0].get("equity", v)) if storia else v
         state[k] = v
     return state
 
@@ -176,6 +188,44 @@ def load_state(cfg: dict) -> dict:
         return s
     with open(STATE_FILE) as f:
         return _con_default(json.load(f), cfg)
+
+
+def adegua_capitale(state: dict, cfg: dict) -> float:
+    """
+    Allinea lo stato a un aumento di 'capital' in configurazione, trattandolo
+    per quello che e': un VERSAMENTO, non un capitale iniziale diverso.
+
+    Perche' non basta cambiare il numero in config.json: i rendimenti si
+    calcolano come equity / capitale_versato - 1. Se alzi il capitale da 100 a
+    200 mentre in cassa ci sono 100 EUR, quella formula restituisce -50%, cioe'
+    una perdita che non e' mai avvenuta. Qui i 100 EUR nuovi entrano davvero in
+    cassa e il denominatore sale insieme a loro.
+
+    peak_equity sale della stessa cifra, altrimenti il kill switch vedrebbe un
+    drawdown istantaneo del 50% e fermerebbe tutto.
+
+    Restituisce l'importo versato (0.0 se non c'era nulla da fare).
+
+    Una diminuzione di 'capital' NON produce un prelievo automatico: togliere
+    soldi da un conto e' un'operazione che deve restare manuale.
+    """
+    versato = float(state.get("capitale_versato", cfg["capital"]))
+    voluto = float(cfg["capital"])
+    delta = round(voluto - versato, 8)
+    if delta <= 0:
+        if delta < 0:
+            print(f"[capitale] config dice {voluto:.2f} EUR ma ne risultano "
+                  f"versati {versato:.2f}. Non tolgo nulla da solo: se vuoi "
+                  f"ridurre il conto, fallo a mano.")
+        return 0.0
+    state["cash"] = float(state.get("cash", 0.0)) + delta
+    state["capitale_versato"] = voluto
+    state["peak_equity"] = float(state.get("peak_equity", 0.0)) + delta
+    journal("deposit", notional=round(delta, 2), equity=round(state["cash"], 2),
+            reason=f"versamento: capitale da {versato:.2f} a {voluto:.2f} EUR",
+            confirmed=True)
+    print(f"[capitale] versati {delta:.2f} EUR: da {versato:.2f} a {voluto:.2f}")
+    return delta
 
 
 def save_state(state: dict) -> None:

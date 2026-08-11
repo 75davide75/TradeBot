@@ -37,14 +37,29 @@ CAMPI_OP = ("ts", "action", "pair", "price", "notional", "leverage", "reason")
 def costruisci() -> dict:
     state = json.load(open(STATE_FILE)) if os.path.exists(STATE_FILE) else {}
     hist = state.get("history", [])
-    cap = CFG["capital"]
+    # Il capitale di riferimento e' quello VERSATO, non quello di partenza:
+    # dopo un versamento sono numeri diversi, e usare il secondo mostrerebbe
+    # una perdita mai avvenuta.
+    cap = float(state.get("capitale_versato", CFG["capital"]))
 
+    # Il benchmark buy&hold riceve gli stessi versamenti negli stessi momenti,
+    # altrimenti il confronto e' truccato: il nostro portafoglio avrebbe soldi
+    # in piu' che il benchmark non ha mai ricevuto.
     equity, bench = [], []
-    btc0 = next((h["btc"] for h in hist if h.get("btc")), None)
+    prec_btc = prec_vers = None
+    valore = None
     for h in hist:
         equity.append({"x": h["ts"], "y": round(h["equity"], 4)})
-        if btc0 and h.get("btc"):
-            bench.append({"x": h["ts"], "y": round(cap * h["btc"] / btc0, 4)})
+        btc = h.get("btc")
+        vers = float(h.get("versato", CFG["capital"]))
+        if not btc:
+            continue
+        if valore is None:
+            valore = vers                      # primo punto: il benchmark parte da li'
+        else:
+            valore = valore * (btc / prec_btc) + (vers - prec_vers)
+        prec_btc, prec_vers = btc, vers
+        bench.append({"x": h["ts"], "y": round(valore, 4)})
 
     ops = []
     if os.path.exists(JOURNAL_FILE):
