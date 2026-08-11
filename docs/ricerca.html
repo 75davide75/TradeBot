@@ -96,7 +96,9 @@ sistema sui suoi dati reali. Il documento nasce da una domanda precisa — <em>s
     <li><a href="#p4">Cosa abbiamo misurato noi</a></li>
     <li><a href="#p5">Un guasto che invalidava tutte le misure</a></li>
     <li><a href="#p6">Si può replicare il day trading, automatizzandolo?</a></li>
-    <li><a href="#p7">Conclusioni operative</a></li>
+    <li><a href="#p7">Lo scalping a soglie strette: 888 operazioni simulate</a></li>
+    <li><a href="#p8">Segnali da notizie, geopolitica e analisti</a></li>
+    <li><a href="#p9">Conclusioni operative</a></li>
     <li><a href="#fonti">Fonti</a></li>
   </ol>
 </div>
@@ -430,7 +432,116 @@ mese</strong>. Reale, documentato, e lontanissimo dai 5 € a settimana.</p>
 <tr><td>Trend following a bassa frequenza</td><td>Incerto</td><td class="up">Sì</td><td class="n">≈ 0%, IC contiene zero</td></tr>
 </tbody></table></div>
 
-<h2 id="p7">7. Conclusioni operative</h2>
+<h2 id="p7">7. Lo scalping a soglie strette: 888 operazioni simulate</h2>
+
+<p>L'idea più diffusa fra chi comincia, e la più ragionevole in apparenza: entrare,
+uscire subito se il prezzo scende dello 0,5%, incassare quando sale del 2%. Perdi poco
+e vinci tanto — quattro a uno — e ripetendolo decine di volte al giorno il vantaggio
+dovrebbe accumularsi.</p>
+
+<p>È testabile, quindi l'abbiamo testata. Otto mercati, 30 giorni di barre orarie reali,
+massimi e minimi effettivi per stabilire quando le soglie vengono toccate. Regola
+prudente: se dentro la stessa barra si toccano entrambe, vince lo stop.</p>
+
+<div class="tabellabox"><table>
+<thead><tr><th>mercato</th><th class="n">operaz.</th><th class="n">% vinte</th><th class="n">lordo</th><th class="n">costi</th><th class="n">netto</th></tr></thead>
+<tbody>
+<tr><td>BTC</td><td class="n">49</td><td class="n">18%</td><td class="n">−2,0%</td><td class="n">5,0%</td><td class="n down">−7,0%</td></tr>
+<tr><td>ETH</td><td class="n">98</td><td class="n">20%</td><td class="n">+1,0%</td><td class="n">10,3%</td><td class="n down">−9,3%</td></tr>
+<tr><td>XRP</td><td class="n">92</td><td class="n">18%</td><td class="n">−3,5%</td><td class="n">10,4%</td><td class="n down">−13,9%</td></tr>
+<tr><td>SOL</td><td class="n">94</td><td class="n">22%</td><td class="n">+5,5%</td><td class="n">10,6%</td><td class="n down">−5,1%</td></tr>
+<tr><td>LINK</td><td class="n">127</td><td class="n">24%</td><td class="n">+11,5%</td><td class="n">15,6%</td><td class="n down">−4,1%</td></tr>
+<tr><td>LTC</td><td class="n">93</td><td class="n">20%</td><td class="n">+1,0%</td><td class="n">11,4%</td><td class="n down">−10,4%</td></tr>
+<tr><td>ADA</td><td class="n">212</td><td class="n">23%</td><td class="n">+16,5%</td><td class="n">29,2%</td><td class="n down">−12,7%</td></tr>
+<tr><td>DOT</td><td class="n">123</td><td class="n">17%</td><td class="n">−9,0%</td><td class="n">15,4%</td><td class="n down">−24,4%</td></tr>
+<tr><td><strong>totale</strong></td><td class="n"><strong>888</strong></td><td class="n"><strong>21%</strong></td><td class="n"><strong>+21,0%</strong></td><td class="n"><strong>107,9%</strong></td><td class="n down"><strong>−86,9%</strong></td></tr>
+</tbody></table></div>
+
+<h3>Perché non funziona, e non è sfortuna</h3>
+
+<p>Per un prezzo senza tendenza, la probabilità di toccare +2% prima di −0,5% è data
+dalla formula della rovina del giocatore:</p>
+
+<pre>P(vincere) = 0,5 / (0,5 + 2) = 20%</pre>
+
+<p>La simulazione ha misurato <strong>21%</strong>. Il mercato si comporta esattamente
+come la matematica prevede.</p>
+
+<p>Il punto è che le due asimmetrie si annullano: il rapporto <strong>4:1 sul
+guadagno</strong> viene con un rapporto <strong>1:4 sulla probabilità</strong>. Il
+guadagno atteso a costi zero è:</p>
+
+<pre>20% × (+2%)  +  80% × (−0,5%)  =  +0,0000%</pre>
+
+<p>Zero esatto. Le soglie sono eque, non c'è vantaggio da nessuna parte — ed è quello
+che "nessun pasto gratis" significa in termini meccanici. Poi arrivano i costi, 0,118%
+per giro sui mercati liquidi, e il valore atteso per operazione diventa
+<strong>−0,118%</strong>. Servirebbe il <strong>24,7%</strong> di vincite per andare
+in pari; se ne ottiene il 21%.</p>
+
+<div class="nota attenzione"><span class="et">La frequenza è il moltiplicatore</span>
+Il valore atteso per operazione è una costante negativa. Aumentare il numero di
+operazioni non lo migliora: lo amplifica. La frequenza moltiplica l'unica quantità
+certa dell'intera operazione, che è il costo.</div>
+
+<div class="tabellabox"><table>
+<thead><tr><th>operazioni al giorno</th><th class="n">perdita giornaliera</th><th class="n">dopo un mese</th></tr></thead>
+<tbody>
+<tr><td>10</td><td class="n">−1,2%</td><td class="n">−30%</td></tr>
+<tr><td>50</td><td class="n">−5,7%</td><td class="n">−95%</td></tr>
+<tr><td>100</td><td class="n down">−11,1%</td><td class="n down">−99,99%</td></tr>
+</tbody></table></div>
+
+<p>Chi guadagna con centinaia di operazioni al giorno è chi <em>incassa</em> lo spread,
+non chi lo paga. È la stessa distinzione della sezione 6: il market maker sta dall'altro
+lato del banco.</p>
+
+<h2 id="p8">8. Segnali da notizie, geopolitica e analisti</h2>
+
+<p>L'altra idea naturale: se il prezzo non basta, aggiungiamo informazione — notizie,
+eventi geopolitici, previsioni degli analisti. Anche questa è stata misurata, e da chi
+aveva i dati per farlo bene.</p>
+
+<p>Barber, Lehavy, McNichols e Trueman hanno preso le raccomandazioni degli analisti
+professionisti su dieci anni di mercato azionario americano:</p>
+
+<div class="tabellabox"><table>
+<thead><tr><th>Portafoglio</th><th class="n">Rendimento annuo</th></tr></thead>
+<tbody>
+<tr><td>azioni più raccomandate</td><td class="n up">+18,8%</td></tr>
+<tr><td>azioni meno raccomandate</td><td class="n">+5,78%</td></tr>
+<tr><td>differenza lorda</td><td class="n up">13 punti</td></tr>
+<tr><td><strong>strategia al netto dei costi</strong></td><td class="n down"><strong>da −1,8% a −3,6%</strong></td></tr>
+</tbody></table></div>
+
+<p><strong>Il segnale è reale ed è interamente mangiato dal costo di raccoglierlo</strong>,
+perché catturare quella differenza richiede di ribilanciare in continuazione. È lo stesso
+esito del nostro <code>xs_carry</code>: Sharpe 3,75 lordo, zero una volta contati spread
+e commissioni.</p>
+
+<h3>Tre problemi specifici delle notizie</h3>
+
+<p><strong>La notizia è già nel prezzo.</strong> Quando un titolo è leggibile da un'API
+pubblica è stato scontato in secondi da sistemi con feed diretti. La gara non è contro
+altri operatori al dettaglio.</p>
+
+<p><strong>Quello che il machine learning trova non sono le notizie.</strong> Gu, Kelly e
+Xiu hanno dato a reti neurali oltre 900 segnali predittivi: i metodi convergono tutti
+sugli stessi pochi dominanti, ossia <em>momentum, liquidità e volatilità</em>. Fattori
+di prezzo noti da decenni.</p>
+
+<p><strong>Con un modello linguistico il backtest mente.</strong> Gli LLM sono addestrati
+su testo storico e lo ricordano: sono documentate correlazioni prossime al 100% su
+rendimenti annuali dell'S&amp;P 500. Non è preveggenza, è memoria — e produce backtest
+splendidi con risultati reali nulli.</p>
+
+<div class="nota chiave"><span class="et">Quello che invece ha senso</span>
+Adattarsi alle <em>condizioni</em> usando dati di prezzo. Il volatility targeting è
+esattamente questo, ed è già nel sistema. Il funding rate dei perpetui è la cosa più
+vicina a un indicatore di posizionamento che sia gratuita, in tempo reale e
+quantificabile: è il segnale carry della sezione 4.</div>
+
+<h2 id="p9">9. Conclusioni operative</h2>
 
 <ol>
 <li><strong>L'obiettivo di rendimento va abbandonato, non ridotto.</strong> Un obiettivo fisso
@@ -464,6 +575,9 @@ avere vantaggio vale più di uno che mostra una curva in salita costruita su un 
 <ul class="fonti">
 <li>Chague, De-Losso, Giovannetti, <em>Day Trading for a Living?</em> (2020) —
 <a href="https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3423101">SSRN</a></li>
+<li>Barber, Lehavy, McNichols, Trueman, <em>Can Investors Profit from the Prophets?
+Security Analyst Recommendations and Stock Returns</em>, Journal of Finance (2001) —
+<a href="https://onlinelibrary.wiley.com/doi/abs/10.1111/0022-1082.00336">Wiley</a></li>
 <li>Barber, Lee, Liu, Odean, <em>Do Day Traders Rationally Learn About Their Ability?</em> —
 <a href="https://faculty.haas.berkeley.edu/odean/papers/Day%20Traders/Day%20Trading%20and%20Learning%20110217.pdf">UC Berkeley (PDF)</a></li>
 <li>Barber, Lee, Liu, Odean, <em>The Cross-Section of Speculator Skill: Evidence from Day Trading</em> —
