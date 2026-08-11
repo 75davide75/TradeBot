@@ -353,6 +353,43 @@ def apri_ombra(state, pair, side, price, notional):
     }
 
 
+def avvia_ombra_rispecchiando(state: dict, cfg: dict) -> int:
+    """
+    Se l'ombra non ha mai operato ma il portafoglio vero ha gia' posizioni
+    aperte, l'ombra le apre alle stesse condizioni: stesso mercato, stessa
+    direzione, stesso prezzo d'ingresso, stessa data di apertura.
+
+    Senza questo l'ombra resterebbe in liquidita' mentre il vero e' investito,
+    e per settimane il grafico mostrerebbe una linea piatta accanto a una che
+    si muove. Non sarebbe un confronto, sarebbe un invito a leggerlo male: il
+    portafoglio vero sembrerebbe battere l'ombra solo perche' l'ombra non sta
+    giocando.
+
+    Le posizioni ereditate pagano la commissione d'ingresso, come le avesse
+    aperte davvero: un'ombra che non paga i costi non e' un metro di paragone,
+    e' un vantaggio regalato.
+    """
+    if state.get("shadow_avviato") or state.get("shadow_positions"):
+        return 0
+    pos = state.get("positions") or {}
+    if not pos:
+        return 0
+    n = max(1, len(cfg.get("universe") or pos))
+    alloc = float(state.get("shadow_cash", 0.0)) / n
+    taker, apert, _ = costi_correnti()
+    for pair, p in pos.items():
+        notional = alloc * LEVA_OMBRA
+        state["shadow_cash"] -= notional * (taker + apert)
+        state.setdefault("shadow_positions", {})[pair] = {
+            "side": p["side"], "entry": p["entry"], "notional": notional,
+            "leverage": LEVA_OMBRA, "opened": p["opened"],
+        }
+    state["shadow_avviato"] = True
+    print(f"[ombra] avviata rispecchiando {len(pos)} posizioni gia' aperte, "
+          f"{alloc:.2f} EUR ciascuna a leva {LEVA_OMBRA:.0f}x")
+    return len(pos)
+
+
 def chiudi_ombra(state, pair, price) -> float:
     p = state.get("shadow_positions", {}).pop(pair, None)
     if not p:

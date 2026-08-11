@@ -26,7 +26,8 @@ from datetime import datetime, timezone
 
 from core import (DATA_DIR, LEVA_OMBRA, StatoPerduto, adegua_capitale,
                   allinea_ombra_se_ferma,
-                  apri_ombra, check_kill_switch, chiudi_ombra, close_position,
+                  apri_ombra, avvia_ombra_rispecchiando, check_kill_switch,
+                  chiudi_ombra, close_position,
                   equity, equity_ombra, fetch_ohlc, fetch_price, journal,
                   load_config, load_state, migra_se_serve, open_position,
                   order_minimum, save_state, signal_momentum, target_leverage)
@@ -452,9 +453,11 @@ def controlla_stato_allavvio():
     # farebbe apparire una perdita che non e' mai avvenuta.
     st = load_state(CFG)
     delta = adegua_capitale(st, CFG)
-    if allinea_ombra_se_ferma(st):
-        save_state(st)
-    if delta:
+    cambiato = allinea_ombra_se_ferma(st)
+    # L'ordine conta: prima la cassa giusta, poi le posizioni da rispecchiare.
+    if avvia_ombra_rispecchiando(st, CFG):
+        cambiato = True
+    if cambiato or delta:
         save_state(st)
         send(f"💶 <b>Versamento registrato</b>\n"
              f"Capitale portato a {st['capitale_versato']:.2f} € "
