@@ -1,114 +1,258 @@
-<!DOCTYPE html><html lang="it"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>TradeBot — dashboard</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+<!DOCTYPE html><html lang="it"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TradeBot</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
 <style>
+:root{
+  --bg:#0a0b0d; --surf:#131519; --surf2:#1a1d23; --line:#23262d; --line2:#2d313a;
+  --txt:#e8eaed; --dim:#8b9099; --faint:#5c626b;
+  --up:#26a69a; --down:#ef5350; --accent:#3b82f6; --warn:#e3b341;
+}
 *{box-sizing:border-box;margin:0;padding:0}
-body{font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-     background:#0f1115;color:#e6e6e6;padding:24px 20px 60px;max-width:1080px;margin:0 auto}
-h1{font-size:21px;font-weight:500}
-h2{font-size:16px;font-weight:500;margin:28px 0 12px}
-.sub{color:#8b8f98;font-size:13px;margin:4px 0 22px}
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:12px}
-.card{background:#171a21;border-radius:10px;padding:16px}
-.card .l{font-size:12px;color:#8b8f98;margin-bottom:6px}
-.card .v{font-size:23px;font-weight:500}
-.card .d{font-size:12px;margin-top:4px}
-.pos{color:#3fb950}.neg{color:#f85149}
-.warn{background:#241d0d;border:1px solid #5c4310;border-radius:10px;
-      padding:13px 15px;margin:18px 0;font-size:13.5px;color:#e3b341}
-.chart{background:#171a21;border-radius:10px;padding:18px;height:390px;margin-top:22px}
-table{width:100%;border-collapse:collapse;background:#171a21;border-radius:10px;
-      overflow:hidden;font-size:13px}
-th{text-align:left;padding:10px 12px;color:#8b8f98;font-weight:500;border-bottom:1px solid #23262e}
-td{padding:9px 12px;border-bottom:1px solid #1c1f26}
-tr:last-child td{border:0}
-.badge{padding:2px 8px;border-radius:4px;font-size:11px;white-space:nowrap}
-.open{background:#132d1a;color:#3fb950}.close{background:#2d1416;color:#f85149}
-.foot{color:#5c6069;font-size:12px;margin-top:34px;line-height:1.8}
-a{color:#4c8ed9}
-</style></head><body>
+body{background:var(--bg);color:var(--txt);font:15px/1.55 Inter,-apple-system,sans-serif;
+     -webkit-font-smoothing:antialiased}
+.wrap{max-width:1180px;margin:0 auto;padding:28px 22px 80px}
+.mono{font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums}
 
-<h1>TradeBot — dashboard</h1>
-<div class="sub" id="sub">caricamento…</div>
+header{display:flex;align-items:center;justify-content:space-between;gap:16px;
+       flex-wrap:wrap;margin-bottom:26px}
+h1{font-size:19px;font-weight:600;letter-spacing:-.01em;display:flex;align-items:center;gap:10px}
+.tag{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+     padding:3px 8px;border-radius:5px;background:rgba(59,130,246,.13);color:#7ba9f5}
+.sub{color:var(--faint);font-size:12.5px;margin-top:3px}
+.ctrl{display:flex;align-items:center;gap:10px}
+button{font:inherit;font-size:13px;font-weight:500;color:var(--txt);cursor:pointer;
+       background:var(--surf2);border:1px solid var(--line2);border-radius:8px;
+       padding:8px 14px;display:flex;align-items:center;gap:7px;transition:.15s}
+button:hover{background:#22262e;border-color:#3a3f4a}
+button.on{background:rgba(38,166,154,.14);border-color:rgba(38,166,154,.5);color:#4dd0c4}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--faint)}
+button.on .dot{background:var(--up);animation:puls 1.6s ease-in-out infinite}
+@keyframes puls{0%,100%{opacity:1}50%{opacity:.25}}
+
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(178px,1fr));gap:12px;margin-bottom:24px}
+.kpi{background:var(--surf);border:1px solid var(--line);border-radius:12px;padding:15px 17px}
+.kpi .l{font-size:11.5px;color:var(--faint);letter-spacing:.02em;margin-bottom:7px}
+.kpi .v{font-size:25px;font-weight:600;letter-spacing:-.02em;line-height:1.1}
+.kpi .d{font-size:12.5px;margin-top:5px;color:var(--dim)}
+.up{color:var(--up)}.down{color:var(--down)}
+
+.note{background:rgba(227,179,65,.07);border:1px solid rgba(227,179,65,.24);
+      border-radius:10px;padding:12px 15px;margin-bottom:22px;font-size:13.5px;color:#d9b45a}
+
+h2{font-size:14px;font-weight:600;color:var(--dim);letter-spacing:.03em;
+   text-transform:uppercase;margin:30px 0 13px}
+
+.card{background:var(--surf);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.eqbox{padding:16px 18px 10px}
+#eq{height:300px}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(348px,1fr));gap:13px}
+.pos{background:var(--surf);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.pos header{display:flex;align-items:flex-start;justify-content:space-between;
+            padding:13px 16px 11px;margin:0;border-bottom:1px solid var(--line)}
+.sym{font-size:14.5px;font-weight:600;letter-spacing:-.01em}
+.meta{font-size:11.5px;color:var(--faint);margin-top:2px}
+.side{font-size:10px;font-weight:600;letter-spacing:.07em;padding:2.5px 7px;border-radius:4px}
+.long{background:rgba(38,166,154,.15);color:#4dd0c4}
+.short{background:rgba(239,83,80,.15);color:#f08a88}
+.pnl{text-align:right}
+.pnl .p{font-size:17px;font-weight:600;letter-spacing:-.01em}
+.pnl .q{font-size:11.5px;color:var(--faint);margin-top:2px}
+.chart{height:172px}
+.foot{display:flex;justify-content:space-between;padding:10px 16px;
+      border-top:1px solid var(--line);font-size:11.5px;color:var(--faint)}
+
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:11px 15px;color:var(--faint);font-weight:500;font-size:11.5px;
+   letter-spacing:.03em;text-transform:uppercase;border-bottom:1px solid var(--line)}
+td{padding:10px 15px;border-bottom:1px solid rgba(35,38,45,.65)}
+tr:last-child td{border:0}
+tr:hover td{background:rgba(255,255,255,.016)}
+.pill{font-size:10.5px;font-weight:600;padding:2.5px 8px;border-radius:4px;letter-spacing:.03em}
+.op{background:rgba(38,166,154,.14);color:#4dd0c4}
+.cl{background:rgba(239,83,80,.14);color:#f08a88}
+.why{color:var(--faint);font-size:12px}
+
+footer{margin-top:38px;padding-top:20px;border-top:1px solid var(--line);
+       color:var(--faint);font-size:12.5px;line-height:1.75}
+a{color:#6b9fe8;text-decoration:none}a:hover{text-decoration:underline}
+.skel{color:var(--faint);padding:40px;text-align:center;font-size:13.5px}
+@media(max-width:640px){.wrap{padding:20px 15px 60px}.kpi .v{font-size:21px}}
+</style></head><body>
+<div class="wrap">
+
+<header>
+  <div>
+    <h1>TradeBot <span class="tag" id="mkt">perpetui</span></h1>
+    <div class="sub" id="sub">caricamento…</div>
+  </div>
+  <div class="ctrl">
+    <button id="live"><span class="dot"></span><span id="livetxt">Avvia live</span></button>
+    <button id="rel">Ricarica</button>
+  </div>
+</header>
+
 <div id="alert"></div>
-<div class="cards" id="cards"></div>
-<div class="chart"><canvas id="c"></canvas></div>
+<div class="kpis" id="kpis"></div>
+
+<h2>Andamento del portafoglio</h2>
+<div class="card eqbox"><div id="eq"></div></div>
+
+<h2>Posizioni aperte</h2>
+<div class="grid" id="pos"><div class="skel">caricamento…</div></div>
+
 <h2>Operazioni</h2>
-<table id="tab"><thead><tr><th>Data</th><th>Tipo</th><th>Coppia</th><th>Prezzo</th>
-<th>Nozionale</th><th>Leva</th><th>Motivo</th></tr></thead><tbody></tbody></table>
-<div class="foot" id="foot"></div>
+<div class="card"><table><thead><tr>
+  <th>Data</th><th>Tipo</th><th>Mercato</th><th>Prezzo</th><th>Nozionale</th><th>Leva</th><th>Motivo</th>
+</tr></thead><tbody id="ops"></tbody></table></div>
+
+<footer id="ft"></footer>
+</div>
 
 <script>
-const eur = n => n==null ? '—' : n.toFixed(2)+' €';
-const pct = n => n==null ? '—' : (n>=0?'+':'')+(n*100).toFixed(2)+'%';
-const cls = n => n==null ? '' : (n>=0?'pos':'neg');
+const PERP={XXBTZEUR:'PF_XBTUSD',XETHZEUR:'PF_ETHUSD',XXRPZEUR:'PF_XRPUSD',SOLEUR:'PF_SOLUSD',
+ LINKEUR:'PF_LINKUSD',XLTCZEUR:'PF_LTCUSD',ADAEUR:'PF_ADAUSD',DOTEUR:'PF_DOTUSD',
+ AVAXEUR:'PF_AVAXUSD',BCHEUR:'PF_BCHUSD',XXMRZEUR:'PF_XMRUSD',ATOMEUR:'PF_ATOMUSD',
+ FILEUR:'PF_FILUSD',UNIEUR:'PF_UNIUSD'};
+const nome=p=>(PERP[p]||p).replace('PF_','').replace('USD','').replace('XBT','BTC');
+const eur=n=>n==null?'—':n.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+const pct=n=>n==null?'—':(n>=0?'+':'')+(n*100).toFixed(2)+'%';
+const cls=n=>n==null?'':(n>=0?'up':'down');
+const opt={layout:{background:{color:'transparent'},textColor:'#8b9099',fontFamily:'JetBrains Mono',fontSize:11},
+  grid:{vertLines:{color:'rgba(35,38,45,.5)'},horzLines:{color:'rgba(35,38,45,.5)'}},
+  rightPriceScale:{borderColor:'#23262d'},timeScale:{borderColor:'#23262d'},
+  crosshair:{mode:1,vertLine:{color:'#3a3f4a',labelBackgroundColor:'#1a1d23'},
+             horzLine:{color:'#3a3f4a',labelBackgroundColor:'#1a1d23'}}};
 
-fetch('data.json?t='+Date.now()).then(r=>r.json()).then(render).catch(e=>{
-  document.getElementById('sub').textContent =
-    'Impossibile caricare data.json — il Pi non ha ancora pubblicato i dati.';
-});
+let D=null, live=false, timer=null, prezzi={}, serie={};
 
-function render(D){
-  const rEq = D.eq_ora/D.capitale - 1;
-  const rBh = D.bh_ora ? D.bh_ora/D.capitale - 1 : null;
-  const diff = rBh==null ? null : rEq - rBh;
+async function carica(){
+  D=await (await fetch('data.json?t='+Date.now())).json();
+  render();
+  await candele();
+  aggiorna();
+}
 
-  document.getElementById('sub').textContent =
-    `Capitale iniziale ${D.capitale} € · ${D.n_ops} operazioni chiuse · `+
-    `${D.n_pos} posizioni aperte · aggiornato ${new Date(D.aggiornato).toLocaleString('it-IT')}`;
+function render(){
+  const rEq=D.eq_ora/D.capitale-1, rBh=D.bh_ora?D.bh_ora/D.capitale-1:null;
+  const diff=rBh==null?null:rEq-rBh;
+  document.getElementById('mkt').textContent=D.mercato||'perpetui';
+  document.getElementById('sub').textContent=
+    `capitale iniziale ${D.capitale} € · ${D.n_ops} operazioni chiuse · aggiornato ${new Date(D.aggiornato).toLocaleString('it-IT')}`;
 
   let a='';
-  if(D.halted) a+='<div class="warn">🟥 Sistema bloccato: '+(D.halt_reason||'')+'</div>';
-  if(D.paused) a+='<div class="warn">⏸️ Sistema in pausa — capitale liquidato.</div>';
-  if(D.n_ops < 30) a+='<div class="warn">⚠️ Solo '+D.n_ops+' operazioni chiuse. '+
-    'Sotto le ~30 qualunque risultato è statisticamente indistinguibile dal caso: '+
-    'questi numeri non dicono ancora se la strategia funziona.</div>';
-  document.getElementById('alert').innerHTML = a;
+  if(D.halted) a+=`<div class="note">Sistema bloccato: ${D.halt_reason||''}</div>`;
+  if(D.paused) a+=`<div class="note">Sistema in pausa — capitale liquidato.</div>`;
+  if(D.n_ops<30) a+=`<div class="note">Solo ${D.n_ops} operazioni chiuse. Sotto le ~30 qualunque risultato è statisticamente indistinguibile dal caso: questi numeri non dicono ancora se la strategia funziona.</div>`;
+  document.getElementById('alert').innerHTML=a;
 
-  document.getElementById('cards').innerHTML = `
-    <div class="card"><div class="l">Portafoglio</div>
-      <div class="v ${cls(rEq)}">${eur(D.eq_ora)}</div>
-      <div class="d ${cls(rEq)}">${pct(rEq)}</div></div>
-    <div class="card"><div class="l">Se avessi comprato solo BTC</div>
-      <div class="v ${cls(rBh)}">${eur(D.bh_ora)}</div>
-      <div class="d ${cls(rBh)}">${pct(rBh)}</div></div>
-    <div class="card"><div class="l">Differenza vs BTC</div>
-      <div class="v ${cls(diff)}">${pct(diff)}</div>
-      <div class="d" style="color:#8b8f98">${diff==null?'dati insufficienti':
-        (diff>=0?'meglio di BTC':'peggio di BTC')}</div></div>
-    <div class="card"><div class="l">Operazioni chiuse</div>
-      <div class="v">${D.n_ops}</div>
-      <div class="d" style="color:#8b8f98">${D.n_ops<30?'campione insufficiente':'campione minimo raggiunto'}</div></div>`;
+  document.getElementById('kpis').innerHTML=`
+   <div class="kpi"><div class="l">Portafoglio</div>
+     <div class="v ${cls(rEq)} mono">${eur(D.eq_ora)}</div>
+     <div class="d ${cls(rEq)}">${pct(rEq)}</div></div>
+   <div class="kpi"><div class="l">Solo BTC (buy &amp; hold)</div>
+     <div class="v ${cls(rBh)} mono">${eur(D.bh_ora)}</div>
+     <div class="d ${cls(rBh)}">${pct(rBh)}</div></div>
+   <div class="kpi"><div class="l">Differenza vs BTC</div>
+     <div class="v ${cls(diff)} mono">${pct(diff)}</div>
+     <div class="d">${diff==null?'dati insufficienti':(diff>=0?'meglio di BTC':'peggio di BTC')}</div></div>
+   <div class="kpi"><div class="l">Posizioni aperte</div>
+     <div class="v mono">${D.n_pos}</div>
+     <div class="d">${D.n_ops} chiuse finora</div></div>`;
 
-  new Chart(document.getElementById('c'),{
-    type:'line',
-    data:{datasets:[
-      {label:'Portafoglio',data:D.equity,borderColor:'#2a78d6',
-       backgroundColor:'rgba(42,120,214,.09)',borderWidth:2,fill:true,pointRadius:0,tension:.15},
-      {label:'Solo BTC (buy & hold)',data:D.benchmark,borderColor:'#eb6834',
-       borderWidth:2,borderDash:[6,4],pointRadius:0,tension:.15,fill:false}]},
-    options:{responsive:true,maintainAspectRatio:false,
-      interaction:{mode:'index',intersect:false},
-      plugins:{legend:{labels:{color:'#8b8f98',usePointStyle:true,boxWidth:8,padding:16}},
-        tooltip:{callbacks:{label:c=>c.dataset.label+': '+c.parsed.y.toFixed(2)+' €'}}},
-      scales:{x:{type:'time',time:{unit:'day'},ticks:{color:'#8b8f98'},grid:{color:'#23262e'}},
-        y:{ticks:{color:'#8b8f98',callback:v=>v+' €'},grid:{color:'#23262e'}}}}});
+  const eqEl=document.getElementById('eq'); eqEl.innerHTML='';
+  const ch=LightweightCharts.createChart(eqEl,{...opt,height:300});
+  const s1=ch.addAreaSeries({lineColor:'#3b82f6',topColor:'rgba(59,130,246,.22)',
+    bottomColor:'rgba(59,130,246,0)',lineWidth:2,priceLineVisible:false});
+  const s2=ch.addLineSeries({color:'#eb6834',lineWidth:2,lineStyle:2,priceLineVisible:false});
+  const conv=a=>a.map(p=>({time:Math.floor(new Date(p.x).getTime()/1000),value:p.y}))
+                 .filter((v,i,a)=>i===0||v.time>a[i-1].time);
+  if(D.equity.length) s1.setData(conv(D.equity));
+  if(D.benchmark.length) s2.setData(conv(D.benchmark));
+  ch.timeScale().fitContent();
+  new ResizeObserver(()=>ch.applyOptions({width:eqEl.clientWidth})).observe(eqEl);
 
-  document.querySelector('#tab tbody').innerHTML = D.ops.map(o=>{
-    const t = o.action==='open' ? 'apertura' : 'chiusura';
-    return `<tr><td>${new Date(o.ts).toLocaleString('it-IT')}</td>
-      <td><span class="badge ${o.action}">${t}</span></td>
-      <td>${o.pair||''}</td><td>${o.price?(+o.price).toFixed(4):''}</td>
-      <td>${o.notional?(+o.notional).toFixed(2)+' €':''}</td>
-      <td>${o.leverage&&+o.leverage?o.leverage+'x':''}</td>
-      <td style="color:#8b8f98">${o.reason||''}</td></tr>`;
-  }).join('') || '<tr><td colspan="7" style="color:#8b8f98">Nessuna operazione ancora</td></tr>';
+  document.getElementById('ops').innerHTML=D.ops.map(o=>`<tr>
+    <td class="mono">${new Date(o.ts).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</td>
+    <td><span class="pill ${o.action==='open'?'op':'cl'}">${o.action==='open'?'apre':'chiude'}</span></td>
+    <td>${nome(o.pair)}</td><td class="mono">${o.price?(+o.price).toFixed(4):''}</td>
+    <td class="mono">${o.notional?(+o.notional).toFixed(2)+' €':''}</td>
+    <td class="mono">${o.leverage&&+o.leverage?(+o.leverage).toFixed(2)+'x':''}</td>
+    <td class="why">${o.reason||''}</td></tr>`).join('')
+    ||'<tr><td colspan="7" class="skel">nessuna operazione ancora</td></tr>';
 
-  document.getElementById('foot').innerHTML =
-    'Paper trading — nessun capitale reale impiegato. Il confronto con BTC buy-and-hold '+
-    'è calcolato sullo stesso identico periodo del portafoglio.<br>'+
-    'Codice: <a href="https://github.com/75davide75/TradeBot">github.com/75davide75/TradeBot</a>';
+  document.getElementById('ft').innerHTML=
+   `Paper trading — nessun capitale reale impiegato. Prezzi e candele arrivano in diretta da Kraken Futures; lo stato del portafoglio dal Raspberry Pi, aggiornato ogni 30 minuti.<br>
+    <a href="https://github.com/75davide75/TradeBot">github.com/75davide75/TradeBot</a>`;
 }
+
+async function candele(){
+  const box=document.getElementById('pos');
+  const P=D.posizioni||{};
+  if(!Object.keys(P).length){box.innerHTML='<div class="skel">nessuna posizione aperta</div>';return}
+  box.innerHTML=Object.entries(P).map(([p,v])=>`
+    <div class="pos" data-p="${p}">
+      <header><div><div class="sym">${nome(p)}
+        <span class="side ${v.side>0?'long':'short'}">${v.side>0?'LONG':'SHORT'}</span></div>
+        <div class="meta mono">ingresso ${(+v.entry).toFixed(4)} · leva ${(+v.leverage).toFixed(2)}x</div></div>
+        <div class="pnl"><div class="p mono" data-pnl>—</div><div class="q mono" data-px>—</div></div>
+      </header>
+      <div class="chart" data-chart></div>
+      <div class="foot"><span>nozionale ${(+v.notional).toFixed(2)} €</span>
+        <span data-stop>stop a ${(-8/ (+v.leverage||1)).toFixed(1)}%</span></div>
+    </div>`).join('');
+
+  const da=Math.floor(Date.now()/1000)-3*86400;
+  for(const [p,v] of Object.entries(P)){
+    const el=document.querySelector(`.pos[data-p="${p}"] [data-chart]`);
+    try{
+      const r=await fetch(`https://futures.kraken.com/api/charts/v1/trade/${PERP[p]||p}/1h?from=${da}`);
+      const c=(await r.json()).candles||[];
+      const ch=LightweightCharts.createChart(el,{...opt,height:172,
+        timeScale:{...opt.timeScale,timeVisible:true}});
+      const s=ch.addCandlestickSeries({upColor:'#26a69a',downColor:'#ef5350',
+        borderUpColor:'#26a69a',borderDownColor:'#ef5350',
+        wickUpColor:'#26a69a',wickDownColor:'#ef5350'});
+      s.setData(c.map(k=>({time:Math.floor(k.time/1000),open:+k.open,high:+k.high,low:+k.low,close:+k.close})));
+      s.createPriceLine({price:+v.entry,color:'#8b9099',lineWidth:1,lineStyle:2,
+        axisLabelVisible:true,title:'ingresso'});
+      ch.timeScale().fitContent();
+      serie[p]={ch,s,ultima:c.length?c[c.length-1]:null};
+      new ResizeObserver(()=>ch.applyOptions({width:el.clientWidth})).observe(el);
+    }catch(e){el.innerHTML='<div class="skel">grafico non disponibile</div>'}
+  }
+}
+
+async function aggiorna(){
+  try{
+    const t=await (await fetch('https://futures.kraken.com/derivatives/api/v3/tickers')).json();
+    const m={}; t.tickers.forEach(x=>m[x.symbol.toUpperCase()]=x);
+    for(const [p,v] of Object.entries(D.posizioni||{})){
+      const k=m[(PERP[p]||p).toUpperCase()]; if(!k) continue;
+      const px=+(k.markPrice||k.last); prezzi[p]=px;
+      const mv=(px-v.entry)/v.entry*v.side, pl=v.notional*mv;
+      const card=document.querySelector(`.pos[data-p="${p}"]`); if(!card) continue;
+      const e=card.querySelector('[data-pnl]');
+      e.textContent=(pl>=0?'+':'')+pl.toFixed(2)+' €';
+      e.className='p mono '+(pl>=0?'up':'down');
+      card.querySelector('[data-px]').textContent=px.toFixed(4)+'  ('+pct(mv)+')';
+      const S=serie[p];
+      if(S&&S.ultima){const u=S.ultima;
+        S.s.update({time:Math.floor(u.time/1000),open:+u.open,
+          high:Math.max(+u.high,px),low:Math.min(+u.low,px),close:px});}
+    }
+  }catch(e){}
+}
+
+document.getElementById('live').onclick=function(){
+  live=!live; this.classList.toggle('on',live);
+  document.getElementById('livetxt').textContent=live?'Live attivo':'Avvia live';
+  if(live){aggiorna();timer=setInterval(aggiorna,1000)}else clearInterval(timer);
+};
+document.getElementById('rel').onclick=()=>location.reload();
+carica().catch(()=>{document.getElementById('sub').textContent=
+  'Impossibile caricare data.json — il Pi non ha ancora pubblicato.'});
 </script></body></html>

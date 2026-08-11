@@ -53,8 +53,23 @@ def costruisci() -> dict:
                     ops.append({k: r.get(k, "") for k in CAMPI_OP})
     ops.reverse()
 
+    # Dettaglio posizioni: serve alla dashboard per disegnare i grafici a
+    # candela e calcolare il P&L in diretta nel browser. Anche qui whitelist:
+    # esce solo cio' che serve al disegno.
+    pos = {}
+    for pair, v in state.get("positions", {}).items():
+        pos[pair] = {
+            "side": v.get("side"),
+            "entry": v.get("entry"),
+            "notional": round(v.get("notional", 0), 2),
+            "leverage": v.get("leverage"),
+            "opened": v.get("opened"),
+        }
+
     return {
         "aggiornato": datetime.now(timezone.utc).isoformat(),
+        "mercato": ("perpetui" if CFG.get("market_type") == "perpetual"
+                    else "spot a margine"),
         "capitale": cap,
         "equity": equity,
         "benchmark": bench,
@@ -62,7 +77,8 @@ def costruisci() -> dict:
         "bh_ora": bench[-1]["y"] if bench else None,
         "ops": ops[:100],
         "n_ops": sum(1 for o in ops if o["action"] == "close"),
-        "n_pos": len(state.get("positions", {})),
+        "n_pos": len(pos),
+        "posizioni": pos,
         "paused": state.get("paused", False),
         "halted": state.get("halted", False),
         "halt_reason": state.get("halt_reason", ""),
