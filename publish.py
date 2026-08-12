@@ -180,7 +180,30 @@ def main():
     stamp = datetime.now().strftime("%Y-%m-%d %H:%M")
     git("commit", "-m", f"dati dashboard {stamp}")
     rc, out = git("push", "origin", "HEAD")
-    print("push OK" if rc == 0 else f"push fallito:\n{out}")
+    if rc == 0:
+        print("push OK")
+        return
+
+    # Il push viene rifiutato ogni volta che qualcuno ha committato dal Mac:
+    # da quel momento la dashboard smette di aggiornarsi e i commit si
+    # accumulano qui, in silenzio, finche' qualcuno non fa un pull a mano.
+    # E' successo davvero, e per 68 minuti la pagina ha mostrato dati vecchi
+    # senza che niente lo dicesse.
+    #
+    # Rebase e non merge: i dati della dashboard si rigenerano a ogni giro,
+    # non c'e' storia da preservare, e una catena di commit di merge in mezzo
+    # ai dati rende illeggibile il log — che e' l'unico posto in cui si puo'
+    # ricostruire cosa e' successo, come gia' e' servito una volta.
+    print(f"push rifiutato, provo a riallinearmi:\n{out}")
+    rc, out = git("pull", "--rebase", "origin", "main")
+    if rc != 0:
+        git("rebase", "--abort")
+        print(f"riallineamento fallito, lascio tutto com'e':\n{out}")
+        print("      Serve un intervento a mano:  git pull --rebase")
+        return
+    rc, out = git("push", "origin", "HEAD")
+    print("push OK dopo il riallineamento" if rc == 0
+          else f"push fallito anche dopo il riallineamento:\n{out}")
 
 
 if __name__ == "__main__":
