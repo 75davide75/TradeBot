@@ -40,6 +40,8 @@
 
   "_nota_ia": "FACOLTATIVO. Senza questa chiave il sistema funziona identico, con due portafogli invece di tre. Con la chiave si accendono: (1) il riassunto in italiano nel messaggio delle 9, (2) il terzo portafoglio, il cui universo e' scelto da un modello linguistico. L'IA non tocca mai il portafoglio reale ne' l'ombra e non decide mai una direzione: sceglie dove guardare, non cosa fare. Serve anche 'pip3 install anthropic'.",
   "anthropic_api_key": "",
+  "_nota_modello": "Facoltativo. Le due chiamate giornaliere su Opus 5 costano circa 4 USD al mese: piu' di quanto un conto da 200 EUR possa ragionevolmente rendere. Su un conto in paper e' il prezzo di un esperimento, ma se pesa si puo' mettere claude-sonnet-5 o claude-haiku-4-5.",
+  "anthropic_model": "claude-opus-5",
 
   "dashboard_port": 8080
 }

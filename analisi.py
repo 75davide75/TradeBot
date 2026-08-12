@@ -35,7 +35,17 @@ accessorio: se manca, il bot funziona uguale.
 import json
 import os
 
+# Il modello si puo' cambiare da config.json con "anthropic_model".
+# Vale la pena saperlo: le due chiamate giornaliere su Opus 5 costano intorno
+# ai 4 USD al mese, cioe' piu' di quanto un conto da 200 EUR possa
+# ragionevolmente rendere. Su un conto in paper e' il prezzo di un
+# esperimento, non un costo operativo — ma va guardato per quello che e'.
 MODELLO = "claude-opus-5"
+
+
+def _modello(cfg: dict) -> str:
+    return cfg.get("anthropic_model") or os.environ.get(
+        "ANTHROPIC_MODEL") or MODELLO
 
 
 def _cliente(cfg: dict):
@@ -89,7 +99,7 @@ def riassunto(cfg: dict, dati: dict):
         return None
     try:
         r = c.messages.create(
-            model=MODELLO,
+            model=_modello(cfg),
             max_tokens=1500,
             system=ISTRUZIONI_RIASSUNTO,
             thinking={"type": "adaptive"},
@@ -165,7 +175,7 @@ def universo_proposto(cfg: dict, candidati: dict, quanti: int):
         return None
     try:
         r = c.messages.create(
-            model=MODELLO,
+            model=_modello(cfg),
             max_tokens=4000,
             system=ISTRUZIONI_UNIVERSO,
             thinking={"type": "adaptive"},

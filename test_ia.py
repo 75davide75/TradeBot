@@ -185,6 +185,22 @@ class TestUniversoProposto(BaseIA):
         self.assertEqual(formato["schema"]["required"],
                          ["mercati", "motivazione", "fiducia"])
 
+    def test_il_modello_si_puo_cambiare_da_config(self):
+        # Su un conto da 200 EUR il costo dell'IA conta: chi vuole spendere
+        # meno deve poterlo fare senza toccare il codice.
+        c = self.cliente(scelta(["XXBTZEUR"]))
+        analisi.universo_proposto(dict(CFG, anthropic_model="claude-haiku-4-5"),
+                                  CANDIDATI, 1)
+        self.assertEqual(c.chiamate[0]["model"], "claude-haiku-4-5")
+
+    def test_senza_indicazioni_usa_il_modello_predefinito(self):
+        vecchio = os.environ.pop("ANTHROPIC_MODEL", None)
+        if vecchio is not None:
+            self.addCleanup(os.environ.__setitem__, "ANTHROPIC_MODEL", vecchio)
+        c = self.cliente(scelta(["XXBTZEUR"]))
+        analisi.universo_proposto(CFG, CANDIDATI, 1)
+        self.assertEqual(c.chiamate[0]["model"], analisi.MODELLO)
+
     def test_i_candidati_arrivano_al_modello(self):
         c = self.cliente(scelta(["XXBTZEUR"]))
         analisi.universo_proposto(CFG, CANDIDATI, 1)
