@@ -99,6 +99,7 @@ sistema sui suoi dati reali. Il documento nasce da una domanda precisa — <em>s
     <li><a href="#p7">Lo scalping a soglie strette: 888 operazioni simulate</a></li>
     <li><a href="#p8">Segnali da notizie, geopolitica e analisti</a></li>
     <li><a href="#p9">Conclusioni operative</a></li>
+    <li><a href="#p10">L'esperimento aperto: far scegliere i mercati all'IA</a></li>
     <li><a href="#fonti">Fonti</a></li>
   </ol>
 </div>
@@ -570,6 +571,73 @@ può curvare.</li>
 Per un sistema come questo il criterio di riuscita non è "quanto guadagna", è
 <strong>"quanto è affidabile ciò che dichiara"</strong>. Un bot che dice onestamente di non
 avere vantaggio vale più di uno che mostra una curva in salita costruita su un bug.</div>
+
+<h2 id="p10">10. L'esperimento aperto: far scegliere i mercati all'IA</h2>
+
+<p>La sezione 3 conclude che chiedere a un modello linguistico dove andrà un prezzo non
+funziona, e che il motivo è strutturale: il modello ha già letto il passato, quindi qualunque
+verifica sul passato è contaminata. Da questa conclusione non segue però che un modello
+linguistico sia inutile ovunque. Segue una cosa più precisa: <strong>non si può sapere in
+anticipo</strong>, e quindi l'unico modo onesto di scoprirlo è misurare in avanti.</p>
+
+<p>Dall'11 agosto 2026 il sistema fa girare <strong>tre portafogli in parallelo</strong>, sugli
+stessi dati e nello stesso istante. Differiscono per una variabile ciascuno, che è l'unica
+condizione sotto cui una differenza si può attribuire a una causa.</p>
+
+<table>
+<thead><tr><th>Portafoglio</th><th>Segnale</th><th>Leva</th><th>Universo</th></tr></thead>
+<tbody>
+<tr><td>Reale</td><td>momentum 60g</td><td>volatility targeting</td><td>lista fissa, filtrata</td></tr>
+<tr><td>Ombra</td><td><em>identico</em></td><td>fissa 1×</td><td><em>identico</em></td></tr>
+<tr><td>Sperimentale</td><td><em>identico</em></td><td><em>identica</em></td><td>scelto da un LLM</td></tr>
+</tbody></table>
+
+<p>La domanda che il terzo portafoglio pone è deliberatamente stretta: non "l'IA sa fare
+trading", ma <em>"la selezione dei mercati, a parità di tutto il resto, vale qualcosa?"</em>.
+Il modello riceve spread, volume 24h, funding annualizzato e variazione a 24 ore dei mercati
+già passati dal filtro di negoziabilità, e sceglie su quali operare. Non decide mai una
+direzione, non vede notizie, non ha accesso al web.</p>
+
+<h3>Le difese, e perché servono tutte</h3>
+<p>Un modello linguistico <strong>risponde sempre</strong>. Chiedendogli quali mercati sembrano
+promettenti si ottiene una lista motivata ogni singolo giorno, anche quando la risposta onesta
+sarebbe "non lo so". Da qui tre vincoli meccanici che non dipendono dalla qualità della
+risposta:</p>
+<ol>
+<li><strong>Sceglie solo dentro un insieme già filtrato</strong> — spread sotto lo 0,15%,
+volume sopra i 250.000 USD nelle 24 ore. Il filtro è aritmetico e non negoziabile.</li>
+<li><strong>I simboli restituiti vengono validati</strong> contro i candidati inviati. Un
+mercato inventato viene scartato prima di poter aprire una posizione — cosa che nei test
+avviene per davvero, non per ipotesi.</li>
+<li><strong>Un cambio di universo al giorno al massimo.</strong> Ogni rimescolamento paga un
+giro di commissioni: sostituire due mercati al giorno su 200 € costa circa il <strong>5,6%
+annuo</strong>, contro l'1,06% del regime attuale. Il modello dovrebbe aggiungere oltre 4,5
+punti di rendimento solo per pagarsi il proprio rimescolamento.</li>
+</ol>
+
+<p>Il portafoglio sperimentale ha lo stesso stop-loss degli altri due. Senza, la differenza fra
+le curve misurerebbe l'assenza dello stop invece della selezione dei mercati — cioè l'unica
+cosa che l'esperimento esiste per misurare.</p>
+
+<div class="nota attenzione"><span class="et">Cosa questo esperimento non è</span>
+Non è una previsione che l'IA farà meglio, e neanche una speranza. La sezione 3 dà tutte le
+ragioni per aspettarsi che non faccia meglio: i fondi che usano machine learning hanno reso il
+9,8% annuo contro il 13,7% dell'S&amp;P 500, e il vantaggio pubblicato evapora del 26% fuori
+campione. L'esperimento serve a trasformare un'opinione in una misura, e costa zero perché
+gira su soldi finti accanto agli altri due.</div>
+
+<h3>Come si leggerà il risultato</h3>
+<p>Non guardando quale linea sta più in alto. Con tre portafogli e pochi mesi di dati, la linea
+più alta è quasi sempre rumore: è lo stesso errore che ha prodotto lo Sharpe 3,75 della sezione
+4. Il confronto valido è fra <em>rendimento per unità di oscillazione</em>, su una finestra
+abbastanza lunga da non essere dominata da una settimana fortunata — e con l'avvertenza, già
+pagata una volta in questo progetto, che togliere dieci giorni su centododici può ribaltare il
+segno del risultato.</p>
+
+<p>Nel frattempo il modello svolge un secondo compito, molto meno ambizioso e molto più solido:
+<strong>riassumere in italiano cosa è successo</strong> nel controllo delle 9:00. È sintesi di
+dati già calcolati, non previsione — l'unico impiego dei modelli linguistici in questo progetto
+che non richieda un esperimento per giustificarsi.</p>
 
 <h2 id="fonti">Fonti</h2>
 <ul class="fonti">

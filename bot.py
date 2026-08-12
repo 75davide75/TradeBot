@@ -24,10 +24,13 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 
-from mercati import scarta
+import analisi
+import perp
+from mercati import scarta, valuta
 from core import (DATA_DIR, LEVA_OMBRA, StatoPerduto, adegua_capitale,
                   allinea_ombra_se_ferma,
-                  apri_ombra, avvia_ombra_rispecchiando, check_kill_switch,
+                  apri_ia, apri_ombra, avvia_ombra_rispecchiando,
+                  check_kill_switch, chiudi_ia, equity_ia,
                   chiudi_ombra, close_position,
                   equity, equity_ombra, fetch_ohlc, fetch_price, journal,
                   load_config, load_state, migra_se_serve, open_position,
@@ -110,12 +113,16 @@ def snapshot(state, eq, prices=None):
         ombra = round(equity_ombra(state, prices or {}), 4)
     except Exception:
         ombra = None
+    try:
+        ia = round(equity_ia(state, prices or {}), 4) if state.get("ia_avviato") else None
+    except Exception:
+        ia = None
     # 'versato' viaggia con ogni punto: senza, il confronto con il buy&hold
     # sarebbe falsato dopo un versamento (il benchmark non avrebbe ricevuto
     # gli stessi soldi nello stesso momento).
     state["history"].append({"ts": datetime.now(timezone.utc).isoformat(),
                              "equity": round(eq, 4), "btc": btc,
-                             "ombra": ombra,
+                             "ombra": ombra, "ia": ia,
                              "versato": round(float(state.get(
                                  "capitale_versato", CFG["capital"])), 4)})
     state["history"] = state["history"][-5000:]
@@ -136,10 +143,13 @@ def risk_check():
          vengono eseguite da sole. Le aperture no, mai: quelle scadono.
     """
     state = load_state(CFG)
-    if not state["positions"] and not pending:
+    # Anche le posizioni del portafoglio sperimentale contano: se il vero e'
+    # in liquidita' e l'IA no, uscire qui vorrebbe dire lasciare l'unico
+    # portafoglio investito senza stop-loss.
+    if not state["positions"] and not state.get("ia_positions") and not pending:
         return
 
-    prices, chiuse = {}, []
+    prices, chiuse, ia_chiuse = {}, [], []
     for pair, p in list(state["positions"].items()):
         try:
             px = fetch_price(pair)
@@ -159,8 +169,30 @@ def risk_check():
             chiudi_ombra(state, pair, px)
             chiuse.append(f"{pair} a {perdita:+.1%}")
 
-    if chiuse:
+    # Lo stop-loss vale anche per il portafoglio sperimentale, sulle SUE
+    # posizioni. Senza, quel portafoglio sarebbe l'unico dei tre a correre
+    # senza rete, e la differenza fra le curve misurerebbe la mancanza dello
+    # stop invece della bonta' della selezione dei mercati — cioe' l'unica
+    # cosa che l'esperimento serve a misurare.
+    for pair, p in list(state.get("ia_positions", {}).items()):
+        try:
+            px = prices.get(pair) or fetch_price(pair)
+        except Exception as e:
+            print(f"[risk-ia] {pair}: {e}")
+            continue
+        move = (px - p["entry"]) / p["entry"] * p["side"]
+        perdita = move * p["leverage"] if p["leverage"] else move
+        if perdita <= -CFG["stop_loss_pct"]:
+            netto = chiudi_ia(state, pair, px)
+            journal("ia_stop", pair=pair, price=px, notional=round(netto, 2),
+                    reason=f"stop-loss portafoglio IA a {perdita:.1%}",
+                    confirmed=True)
+            print(f"[risk-ia] stop-loss su {pair} a {perdita:+.1%}")
+            ia_chiuse.append(pair)
+
+    if chiuse or ia_chiuse:
         save_state(state)
+    if chiuse:
         eq = equity(state, prices)
         send("🔴 <b>STOP-LOSS ESEGUITO</b> (automatico, senza conferma)\n"
              + "\n".join(f"• {c}" for c in chiuse)
@@ -178,7 +210,20 @@ def risk_check():
                  f"{CFG['auto_close_timeout_sec']}s)\n{msg}")
 
 
-def universo_negoziabile(cfg):
+def leggi_tickers():
+    """Ticker di tutti i perpetui, o None se la rete non risponde."""
+    try:
+        return perp.tickers()
+    except Exception as e:
+        print(f"[mercati] ticker non disponibili: {e}")
+        return None
+
+
+def soglie_da(cfg):
+    return {k: cfg[k] for k in ("spread_massimo", "volume_minimo_usd") if k in cfg}
+
+
+def universo_negoziabile(cfg, tickers=None):
     """
     Filtra l'universo tenendo solo i mercati ancora operabili.
 
@@ -194,14 +239,11 @@ def universo_negoziabile(cfg):
     In dubbio, il filtro non fa niente: e' un guardiano, non un decisore.
     """
     universo = list(cfg["universe"])
-    try:
-        import perp
-        tickers = perp.tickers()
-    except Exception as e:
-        print(f"[filtro] dati di liquidita' non disponibili ({e}): nessuna esclusione")
+    if not tickers:
+        print("[filtro] senza dati di liquidita' non escludo niente")
         return universo, {}
 
-    soglie = {k: cfg[k] for k in ("spread_massimo", "volume_minimo_usd") if k in cfg}
+    soglie = soglie_da(cfg)
     tenuti, fuori = scarta(universo, tickers, perp.MAPPA, soglie)
 
     if not tenuti:
@@ -209,6 +251,95 @@ def universo_negoziabile(cfg):
               "nei dati che un mercato morto. Non escludo niente.")
         return universo, {}
     return tenuti, fuori
+
+
+def aggiorna_universo_ia(state, cfg, tickers):
+    """
+    Chiede all'IA quali mercati usare nel portafoglio sperimentale, al massimo
+    una volta al giorno.
+
+    Il limite giornaliero non e' pigrizia: ogni cambio di universo costa un
+    giro di commissioni su ogni mercato che entra o esce. Rimescolare due
+    mercati al giorno su 200 EUR fa circa il 5,6% annuo di costi, contro
+    l'1,06% attuale — l'IA dovrebbe aggiungere piu' di 4,5 punti di rendimento
+    solo per pagarsi il proprio rimescolamento.
+    """
+    ultima = state.get("ia_scelto_il")
+    if ultima:
+        try:
+            eta = (datetime.now(timezone.utc)
+                   - datetime.fromisoformat(ultima)).total_seconds()
+            if eta < 20 * 3600:
+                return False
+        except Exception:
+            pass
+
+    candidati = {}
+    for pair, simbolo in perp.MAPPA.items():
+        t = tickers.get(simbolo.upper())
+        ok, _ = valuta(t, soglie_da(cfg))
+        if not ok:
+            continue
+        px = float(t.get("markPrice") or t.get("last") or 0)
+        candidati[pair] = {
+            "spread_pct": round((float(t["ask"]) - float(t["bid"])) / px * 100, 4),
+            "volume_24h_usd": round(float(t.get("volumeQuote") or 0)),
+            "funding_annuo_pct": round(float(t.get("fundingRate") or 0) / px * 24 * 365 * 100, 1),
+            "variazione_24h_pct": float(t.get("change24h") or 0),
+        }
+
+    scelta = analisi.universo_proposto(cfg, candidati, len(cfg["universe"]))
+    if not scelta:
+        return False
+
+    precedente = set(state.get("ia_universo") or [])
+    state["ia_universo"] = scelta["mercati"]
+    state["ia_scelto_il"] = datetime.now(timezone.utc).isoformat()
+    state["ia_motivazione"] = scelta.get("motivazione", "")
+    journal("ia_universo", reason=f"{','.join(scelta['mercati'])} — "
+            f"fiducia {scelta.get('fiducia','?')}: {scelta.get('motivazione','')[:160]}",
+            confirmed=False)
+
+    uscite = precedente - set(scelta["mercati"])
+    if uscite:
+        for pair in uscite:
+            try:
+                chiudi_ia(state, pair, fetch_price(pair))
+            except Exception as e:
+                print(f"[ia] chiusura {pair} non riuscita: {e}")
+    return True
+
+
+def opera_portafoglio_ia(state, cfg, prices):
+    """
+    Fa operare il portafoglio sperimentale sul suo universo.
+
+    Stesso segnale e stesso dimensionamento del portafoglio vero: l'unica
+    variabile che cambia e' QUALI mercati. Cosi' una differenza nei risultati
+    e' attribuibile alla selezione, non a qualcos'altro.
+    """
+    universo = state.get("ia_universo") or []
+    if not universo:
+        return
+    eq = equity_ia(state, prices)
+    alloc = eq / max(1, len(universo))
+
+    for pair in universo:
+        try:
+            df = fetch_ohlc(pair)
+            px = prices.get(pair) or float(df["close"].iloc[-1])
+            want = signal_momentum(df, cfg["momentum_n"], cfg["allow_short"])
+            lev, _ = target_leverage(df, cfg)
+            have = state.get("ia_positions", {}).get(pair)
+            attuale = have["side"] if have else 0.0
+            if want == attuale:
+                continue
+            if have:
+                chiudi_ia(state, pair, px)
+            if want != 0.0:
+                apri_ia(state, pair, want, px, alloc * lev, lev)
+        except Exception as e:
+            print(f"[ia] {pair}: {e}")
 
 
 # --------------------------------------------------------------------------
@@ -223,7 +354,8 @@ def evaluate():
     # usarla, controllo che i mercati siano ancora negoziabili: Kraken
     # sospende contratti, la liquidita' evapora, gli spread si allargano.
     # Senza questo il bot continuerebbe a operare su un mercato morto.
-    universo, esclusi = universo_negoziabile(CFG)
+    tickers = leggi_tickers()
+    universo, esclusi = universo_negoziabile(CFG, tickers)
     if esclusi:
         send("⚠️ <b>Mercati esclusi dal filtro di negoziabilita'</b>\n"
              + "\n".join(f"• {p}: {m}" for p, m in esclusi.items())
@@ -275,6 +407,15 @@ def evaluate():
         send(f"🛑 <b>SISTEMA FERMATO</b>\n{state['halt_reason']}\n"
              f"Equity {eq:.2f} €. Serve /resume manuale.")
         return
+
+    # Terzo portafoglio: universo scelto dall'IA, stesso segnale e stessa
+    # size. Gira per ultimo e in un try: un guasto qui non deve impedire al
+    # portafoglio vero di salvare il proprio stato.
+    try:
+        aggiorna_universo_ia(state, CFG, tickers or {})
+        opera_portafoglio_ia(state, CFG, prices)
+    except Exception as e:
+        print(f"[ia] portafoglio sperimentale saltato: {e}")
 
     snapshot(state, eq, prices)
     scrivi_conferme(state, conferme)
@@ -374,6 +515,14 @@ def chiudi_tutto(state, motivo: str) -> list:
             chiuse.append(f"{pair} ({pnl:+.2f} €)")
         except Exception as e:
             chiuse.append(f"{pair} ERRORE: {e}")
+
+    # Anche il portafoglio sperimentale va liquidato: /stop e /pausa sono
+    # ordini di fermare tutto, non di fermare quasi tutto.
+    for pair in list(state.get("ia_positions", {})):
+        try:
+            chiudi_ia(state, pair, fetch_price(pair))
+        except Exception as e:
+            print(f"[ia] chiusura {pair} non riuscita: {e}")
 
     rifugio = CFG.get("safe_asset", "EUR").upper()
     if rifugio != "EUR" and chiuse:

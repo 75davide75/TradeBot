@@ -13,6 +13,7 @@ Questo messaggio arriva TUTTI I GIORNI, anche quando va tutto bene. La sua
 assenza e' essa stessa l'allarme.
 """
 
+import csv
 import json
 import os
 import subprocess
@@ -20,6 +21,7 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
+import analisi
 from core import (BASE, DATA_DIR, JOURNAL_FILE, STATE_FILE, fetch_price,
                   load_config, migra_se_serve, modo_perp)
 
@@ -51,11 +53,85 @@ def servizio_attivo(nome: str) -> bool:
         return False
 
 
+def righe_journal(ora, giorni=7):
+    """Le ultime righe del journal, gia' pronte per essere lette dall'IA."""
+    if not os.path.exists(JOURNAL_FILE):
+        return []
+    limite = (ora - timedelta(days=giorni)).isoformat()
+    fuori = []
+    try:
+        with open(JOURNAL_FILE) as f:
+            for r in csv.DictReader(f):
+                if r.get("ts", "") < limite:
+                    continue
+                fuori.append({k: v for k, v in r.items() if v not in ("", None)})
+    except Exception:
+        return []
+    return fuori[-60:]      # basta l'ultima settimana, non tutto il registro
+
+
+def per_ia(st, ora, problemi, righe):
+    """
+    Prepara il quadro che l'IA deve riassumere.
+
+    Solo numeri gia' calcolati e righe di registro: nessuna richiesta di
+    previsione, nessuna domanda su cosa fare. Il modello serve a spiegare
+    cio' che e' successo, non a decidere cosa succedera'.
+    """
+    hist = st.get("history", []) or []
+    ultimo = hist[-1] if hist else {}
+    cap = float(st.get("capitale_versato", CFG["capital"]))
+    eq = float(ultimo.get("equity", st.get("cash", 0.0)))
+    picco = float(st.get("peak_equity", cap) or cap)
+
+    def var(chiave, giorni):
+        """Variazione di una serie sugli ultimi N giorni."""
+        limite = (ora - timedelta(days=giorni)).isoformat()
+        passati = [p for p in hist if p.get("ts", "") <= limite
+                   and p.get(chiave) is not None]
+        if not passati or ultimo.get(chiave) is None:
+            return None
+        prima = float(passati[-1][chiave])
+        return round(float(ultimo[chiave]) / prima - 1, 5) if prima else None
+
+    posizioni = []
+    for pair, p in (st.get("positions") or {}).items():
+        posizioni.append({
+            "mercato": pair,
+            "direzione": "long" if p.get("side", 0) > 0 else "short",
+            "leva": p.get("leverage"),
+            "aperta_il": (p.get("opened") or "")[:10],
+            "prezzo_ingresso": p.get("entry"),
+        })
+
+    return {
+        "data": ora.date().isoformat(),
+        "capitale_versato_eur": cap,
+        "equity_eur": round(eq, 2),
+        "rendimento_totale": round(eq / cap - 1, 5) if cap else None,
+        "rendimento_7_giorni": var("equity", 7),
+        "drawdown_dal_picco": round(eq / picco - 1, 5) if picco else None,
+        "kill_switch_a": -float(CFG["max_drawdown_halt"]),
+        "portafoglio_ombra_eur": ultimo.get("ombra"),
+        "portafoglio_ia_eur": ultimo.get("ia"),
+        "universo_scelto_dall_ia": st.get("ia_universo") or [],
+        "benchmark_btc_eur": ultimo.get("btc"),
+        "posizioni_aperte": posizioni,
+        "universo_configurato": list(CFG["universe"]),
+        "segnale": f"momentum a {CFG['momentum_n']} giorni, "
+                   f"{'con' if CFG['allow_short'] else 'senza'} short",
+        "problemi_rilevati": problemi,
+        "diagnostica": list(righe),
+        "registro_ultimi_7_giorni": righe_journal(ora),
+    }
+
+
 def main():
     migra_se_serve()      # puo' partire prima del bot dopo un aggiornamento
     ora = datetime.now(timezone.utc)
     utente = os.environ.get("USER") or os.environ.get("LOGNAME") or "davide"
     problemi, righe = [], []
+    stato = None
 
     # --- servizi
     for s, etichetta in [(f"tradingbot@{utente}", "bot"),
@@ -68,7 +144,7 @@ def main():
 
     # --- lo stato si aggiorna?
     try:
-        st = json.load(open(STATE_FILE))
+        st = stato = json.load(open(STATE_FILE))
         hist = st.get("history", [])
         if hist:
             ultimo = datetime.fromisoformat(hist[-1]["ts"])
@@ -168,6 +244,21 @@ def main():
     corpo += righe
     corpo += ["", f"<i>mercato: {'perpetui' if modo_perp() else 'spot a margine'} · "
                   f"{len(CFG['universe'])} coppie</i>"]
+
+    # --- lettura in italiano, scritta dall'IA
+    #
+    # Sta in fondo e non blocca niente: senza chiave API la funzione
+    # restituisce None e il messaggio esce identico a prima. La diagnostica
+    # sopra e' fatta di numeri e resta la fonte di verita'; questo e' un
+    # commento a quei numeri, e va letto per quello che e'.
+    if stato is not None:
+        try:
+            testo = analisi.riassunto(CFG, per_ia(stato, ora, problemi, righe))
+        except Exception as e:
+            print(f"[ia] riassunto saltato: {e}")
+            testo = None
+        if testo:
+            corpo += ["", "🧠 <b>Lettura della giornata</b>", testo]
 
     msg = "\n".join(corpo)
     print(msg.replace("<b>", "").replace("</b>", "").replace("<i>", "").replace("</i>", ""))

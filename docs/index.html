@@ -117,6 +117,7 @@ a{color:#6b9fe8;text-decoration:none}a:hover{text-decoration:underline}
 <h2>Andamento del portafoglio</h2>
 <div class="card eqbox"><div id="eq"></div>
   <div id="eqnote" style="padding:6px 2px 12px;font-size:12.5px;color:var(--faint)"></div>
+  <div id="ia" style="padding:0 2px 12px;font-size:12.5px"></div>
 </div>
 
 <h2>Rendimento annuo stimato</h2>
@@ -166,6 +167,11 @@ const PERP=Object.fromEntries(Object.entries(MKT).map(([k,m])=>[k,m.perp]));
 const DA_PERP=Object.fromEntries(Object.entries(MKT).map(([k,m])=>[m.perp,k]));
 const nome=p=>MKT[p]?MKT[p].nome
   :String(p).replace('PF_','').replace(/USDT?$/,'').replace('XBT','BTC');
+// La motivazione dell'IA e' testo generato da un modello e finisce in
+// innerHTML: va sempre neutralizzato. Non e' paranoia teorica — e' l'unico
+// pezzo di questa pagina che nessuno di noi due ha scritto.
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,
+  c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const eur=n=>n==null?'—':n.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
 const pct=n=>n==null?'—':(n>=0?'+':'')+(n*100).toFixed(2)+'%';
 // Quattro decimali su BTC sono rumore, due su ADA cancellano il prezzo.
@@ -225,7 +231,11 @@ function render(){
    ${D.ombra_ora==null?'':`
    <div class="kpi"><div class="l">Senza volatility targeting</div>
      <div class="v ${cls(D.ombra_ora/D.capitale-1)} mono">${eur(D.ombra_ora)}</div>
-     <div class="d">portafoglio ombra, leva fissa 1x</div></div>`}`;
+     <div class="d">portafoglio ombra, leva fissa 1x</div></div>`}
+   ${D.ia_ora==null?'':`
+   <div class="kpi"><div class="l">Mercati scelti dall'IA</div>
+     <div class="v ${cls(D.ia_ora/D.capitale-1)} mono">${eur(D.ia_ora)}</div>
+     <div class="d">portafoglio sperimentale</div></div>`}`;
 
   const eqEl=document.getElementById('eq'); eqEl.innerHTML='';
   const ch=crea(eqEl);
@@ -235,11 +245,16 @@ function render(){
   // Portafoglio ombra: stesse decisioni, leva fissa 1x. Tratteggiato e
   // smorzato perche' e' un metro di paragone, non un risultato.
   const s3=ch.addLineSeries({color:'#9b8bd6',lineWidth:1,lineStyle:3,priceLineVisible:false});
+  // Portafoglio sperimentale: stesso segnale e stessa size, universo scelto
+  // dall'IA. Anche questo smorzato: e' un esperimento in corso, non un
+  // risultato — e va guardato come tale finche' non ha mesi di dati dietro.
+  const s4=ch.addLineSeries({color:'#3fb98c',lineWidth:1,lineStyle:1,priceLineVisible:false});
   const conv=a=>a.map(p=>({time:Math.floor(new Date(p.x).getTime()/1000),value:p.y}))
                  .filter((v,i,a)=>i===0||v.time>a[i-1].time);
   if(D.equity.length) s1.setData(conv(D.equity));
   if(D.benchmark.length) s2.setData(conv(D.benchmark));
   if((D.ombra||[]).length) s3.setData(conv(D.ombra));
+  if((D.ia||[]).length) s4.setData(conv(D.ia));
   ch.timeScale().fitContent();
 
   document.getElementById('eqnote').innerHTML=
@@ -251,7 +266,23 @@ function render(){
          è normale che guadagni e perda di più. Il confronto che conta non è
          quale linea sta più in alto, ma quanto rendimento produce ciascuna
          per unità di oscillazione.`
-     : ` · l'ombra comparirà dopo la prima operazione`);
+     : ` · l'ombra comparirà dopo la prima operazione`) +
+   ((D.ia||[]).length
+     ? `<br><span style="color:#3fb98c">·</span> IA: stesso segnale e stessa
+         size, ma su mercati scelti da un modello linguistico. Serve a
+         misurare in avanti se la selezione ragionata vale qualcosa: non si
+         può backtestare, perché il modello ha già letto il passato.`
+     : '');
+
+  // La scelta dell'IA va mostrata con la sua motivazione, altrimenti è un
+  // oracolo. Con la motivazione è una tesi verificabile.
+  const iaEl=document.getElementById('ia');
+  if(iaEl) iaEl.innerHTML=(D.ia_universo||[]).length
+    ? `<b>Universo scelto dall'IA</b>
+       ${D.ia_scelto_il?`<span style="color:var(--faint)">— ${new Date(D.ia_scelto_il).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</span>`:''}
+       <div style="margin:6px 0">${D.ia_universo.map(p=>`<span class="pill">${esc(nome(p))}</span>`).join(' ')}</div>
+       ${D.ia_motivazione?`<div style="color:var(--faint)">${esc(D.ia_motivazione)}</div>`:''}`
+    : '';
 
   // 'versa' e' un versamento di capitale, non un'operazione di mercato:
   // deve stare qui, altrimenti l'equity salta nel grafico senza spiegazione.

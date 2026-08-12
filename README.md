@@ -75,9 +75,15 @@ candela ancora aperta genera 1,8 falsi cambi per ogni cambio vero — misurato.
 ## Verifiche
 
 ```bash
-python3 -m unittest test_stato -v      # persistenza, versamenti, ombra
-python3 -m unittest test_segnale -v    # segnale (richiede pandas, sennò si salta)
+python3 -m unittest discover -p "test_*.py" -v
 ```
+
+| File | Cosa copre |
+|---|---|
+| `test_stato.py` | Persistenza, versamenti, blocco all'avvio, ombra |
+| `test_mercati.py` | Filtro di negoziabilità: spread, volume, contratti sospesi |
+| `test_ia.py` | Livello IA e terzo portafoglio (nessuna chiamata di rete) |
+| `test_segnale.py` | Segnale (richiede pandas, sennò si salta da solo) |
 
 ## Comandi Telegram
 
@@ -107,6 +113,46 @@ Non a naso. Vengono dal backtest in `RISULTATI.md`:
 - **Portafoglio ombra** — gira in parallelo con leva fissa 1x, rispecchiando
   ogni decisione. Serve a rispondere a "il volatility targeting aiuta o fa
   danni?", che con un solo portafoglio resterebbe un'opinione.
+- **Filtro di negoziabilità** — prima di operare, ogni mercato deve avere
+  spread sotto lo 0,15% e volume sopra i 250.000 USD nelle 24 ore. Sono soglie
+  misurate sui 57 perpetui Kraken, non prudenza generica: su un mercato
+  all'1,3% di spread nessun segnale sopravvive al costo di entrarci e uscirne.
+  Se i dati di liquidità non arrivano, o se il filtro scarterebbe l'universo
+  intero, non esclude niente: in dubbio è un guardiano, non un decisore.
+
+## I tre portafogli
+
+Girano insieme, sugli stessi dati, e differiscono per **una variabile
+ciascuno**. È l'unico modo di attribuire una differenza a una causa.
+
+| Portafoglio | Segnale | Leva | Universo |
+|---|---|---|---|
+| **Reale** | momentum 60g | volatility targeting | lista in `config.json`, filtrata |
+| **Ombra** | *identico* | fissa 1x | *identico* |
+| **Sperimentale** | *identico* | *identica* | scelto da un modello linguistico |
+
+Il terzo portafoglio risponde a "conviene far scegliere i mercati a un'IA?".
+Non si può backtestare: un modello linguistico è addestrato su testo storico e
+lo ricorda, quindi ogni prova sul passato è contaminata — su rendimenti annuali
+dell'S&P 500 sono documentate correlazioni fino al 100%. L'unico modo di
+saperlo è misurare in avanti, con soldi finti, per mesi.
+
+Tre difese, perché un modello che non sa risponde lo stesso:
+
+1. **Sceglie solo fra mercati già filtrati** dal filtro di negoziabilità.
+2. **I simboli tornati vengono validati** contro i candidati: uno inventato
+   non può far aprire una posizione.
+3. **Cambia universo al massimo una volta al giorno.** Ogni rimescolamento
+   costa un giro di commissioni: due mercati al giorno su 200 € fanno circa il
+   5,6% annuo di costi contro l'1,06% attuale — l'IA dovrebbe aggiungere oltre
+   4,5 punti di rendimento solo per pagarsi il proprio rimescolamento.
+
+Ha lo stesso stop-loss degli altri due. Senza, la differenza fra le curve
+misurerebbe la mancanza dello stop invece della selezione dei mercati.
+
+**L'IA non tocca il portafoglio reale né l'ombra**, e non decide mai una
+direzione: sceglie *dove* guardare, non *cosa fare*. Senza chiave API il
+sistema funziona identico, con due portafogli invece di tre.
 
 ## Cosa aspettarsi
 
@@ -128,7 +174,9 @@ l'informazione, ed è costata zero.
 | File | Cosa fa |
 |---|---|
 | `stato.py` | Persistenza: dove vivono i dati, blocco all'avvio, versamenti |
-| `core.py` | Dati, segnale, layer di rischio, portafoglio, ombra |
+| `core.py` | Dati, segnale, layer di rischio, i tre portafogli |
+| `mercati.py` | Filtro di negoziabilità: spread, volume, contratti sospesi |
+| `analisi.py` | Livello IA: riassunto delle 9:00 e scelta dell'universo |
 | `bot.py` | Bot Telegram, processo sempre attivo |
 | `perp.py` | Adattatore per i futures perpetui Kraken |
 | `publish.py` | Genera e pubblica `docs/data.json` per la dashboard |

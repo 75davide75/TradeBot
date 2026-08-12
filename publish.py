@@ -53,13 +53,15 @@ def costruisci() -> dict:
     vers_origine = (float(hist[0].get("versato", hist[0].get("equity", CFG["capital"])))
                     if hist else float(CFG["capital"]))
 
-    equity, bench, ombra = [], [], []
+    equity, bench, ombra, ia = [], [], [], []
     prec_btc = prec_vers = None
     valore = None
     for h in hist:
         equity.append({"x": h["ts"], "y": round(h["equity"], 4)})
         if h.get("ombra") is not None:
             ombra.append({"x": h["ts"], "y": round(float(h["ombra"]), 4)})
+        if h.get("ia") is not None:
+            ia.append({"x": h["ts"], "y": round(float(h["ia"]), 4)})
         btc = h.get("btc")
         vers = float(h.get("versato", vers_origine))
         if not btc:
@@ -107,6 +109,15 @@ def costruisci() -> dict:
         # volatility targeting. Serve a misurare se l'aggiustamento aiuta.
         "ombra": ombra,
         "ombra_ora": ombra[-1]["y"] if ombra else None,
+        # Portafoglio sperimentale: stesso segnale e stessa size, ma
+        # sull'universo scelto dall'IA. La variabile isolata e' la selezione
+        # dei mercati. Parte da zero punti e resta vuoto finche' non opera:
+        # la dashboard non deve disegnare una linea che non esiste ancora.
+        "ia": ia,
+        "ia_ora": ia[-1]["y"] if ia else None,
+        "ia_universo": state.get("ia_universo") or [],
+        "ia_motivazione": state.get("ia_motivazione", ""),
+        "ia_scelto_il": state.get("ia_scelto_il"),
         "eq_ora": equity[-1]["y"] if equity else cap,
         "bh_ora": bench[-1]["y"] if bench else None,
         "ops": ops[:100],

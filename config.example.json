@@ -34,5 +34,12 @@
   "_nota_rifugio": "Il rifugio NON e' BTC: in un crollo crypto BTC scende insieme agli altcoin (correlazione 0.7-0.9). Con un conto in EUR, 'EUR' costa zero commissioni e zero rischio cambio; 'USDC' costa 0.8% andata e ritorno e aggiunge il rischio EUR/USD.",
   "safe_asset": "EUR",
 
+  "_nota_negoziabilita": "Un mercato con spread enorme o volume evaporato non e' un'occasione, e' un modo per pagare il pedaggio due volte. Soglie misurate sui 57 perpetui Kraken: spread mediano 0,057%, massimo 1,279%. Lo 0,15% tiene fuori la coda illiquida e lascia dentro con margine tutti i mercati operati.",
+  "spread_massimo": 0.0015,
+  "volume_minimo_usd": 250000.0,
+
+  "_nota_ia": "FACOLTATIVO. Senza questa chiave il sistema funziona identico, con due portafogli invece di tre. Con la chiave si accendono: (1) il riassunto in italiano nel messaggio delle 9, (2) il terzo portafoglio, il cui universo e' scelto da un modello linguistico. L'IA non tocca mai il portafoglio reale ne' l'ombra e non decide mai una direzione: sceglie dove guardare, non cosa fare. Serve anche 'pip3 install anthropic'.",
+  "anthropic_api_key": "",
+
   "dashboard_port": 8080
 }

@@ -203,7 +203,16 @@ def solo_candele_chiuse(df: pd.DataFrame, interval_min: int = 1440) -> pd.DataFr
     if len(df) < 2:
         return df
     fine = pd.Timestamp(df.index[-1]) + pd.Timedelta(minutes=interval_min)
-    adesso = pd.Timestamp(datetime.now(timezone.utc)).tz_localize(None)
+    adesso = pd.Timestamp(datetime.now(timezone.utc))
+    # Kraken oggi restituisce un indice senza fuso, Bybit potrebbe non farlo, e
+    # confrontare un timestamp con fuso e uno senza solleva un'eccezione. Qui
+    # quell'eccezione verrebbe intercettata dal try per coppia e il mercato
+    # sparirebbe dal giro stampando una riga in mezzo alle altre: un guasto
+    # che si comporta come un mercato tranquillo. Meglio normalizzare.
+    if fine.tzinfo is None:
+        adesso = adesso.tz_localize(None)
+    else:
+        fine = fine.tz_convert("UTC")
     return df.iloc[:-1] if fine > adesso else df
 
 
@@ -346,16 +355,46 @@ def _giorni_aperta(p: dict) -> float:
                      datetime.fromisoformat(p["opened"])).days)
 
 
-def apri_ombra(state, pair, side, price, notional):
+def _apri(state, chiave, pair, side, price, notional, leverage):
+    """Apre in un portafoglio secondario qualsiasi (ombra o sperimentale)."""
     taker, apert, _ = costi_correnti()
-    # Da qui in poi l'ombra ha una storia sua e non va piu' riallineata.
-    state["shadow_avviato"] = True
-    state["shadow_cash"] = state.get("shadow_cash", 0.0) - notional * (taker + apert)
-    state.setdefault("shadow_positions", {})[pair] = {
+    state[f"{chiave}_avviato"] = True
+    state[f"{chiave}_cash"] = (state.get(f"{chiave}_cash", 0.0)
+                               - notional * (taker + apert))
+    state.setdefault(f"{chiave}_positions", {})[pair] = {
         "side": side, "entry": price, "notional": notional,
-        "leverage": LEVA_OMBRA,
+        "leverage": leverage,
         "opened": datetime.now(timezone.utc).isoformat(),
     }
+
+
+def _chiudi(state, chiave, pair, price) -> float:
+    p = state.get(f"{chiave}_positions", {}).pop(pair, None)
+    if not p:
+        return 0.0
+    move = (price - p["entry"]) / p["entry"] * p["side"]
+    pnl = p["notional"] * move
+    carry = p["notional"] * carry_giornaliero(pair, p["side"]) * _giorni_aperta(p)
+    taker, _, _ = costi_correnti()
+    netto = pnl - carry - p["notional"] * taker
+    state[f"{chiave}_cash"] = state.get(f"{chiave}_cash", 0.0) + netto
+    return netto
+
+
+def _equity(state, chiave, prices) -> float:
+    eq = state.get(f"{chiave}_cash", 0.0)
+    for pair, p in state.get(f"{chiave}_positions", {}).items():
+        px = prices.get(pair)
+        if px is None:
+            continue
+        move = (px - p["entry"]) / p["entry"] * p["side"]
+        eq += p["notional"] * move
+        eq -= p["notional"] * carry_giornaliero(pair, p["side"]) * _giorni_aperta(p)
+    return eq
+
+
+def apri_ombra(state, pair, side, price, notional):
+    _apri(state, "shadow", pair, side, price, notional, LEVA_OMBRA)
 
 
 def avvia_ombra_rispecchiando(state: dict, cfg: dict) -> int:
@@ -396,28 +435,41 @@ def avvia_ombra_rispecchiando(state: dict, cfg: dict) -> int:
 
 
 def chiudi_ombra(state, pair, price) -> float:
-    p = state.get("shadow_positions", {}).pop(pair, None)
-    if not p:
-        return 0.0
-    move = (price - p["entry"]) / p["entry"] * p["side"]
-    pnl = p["notional"] * move
-    carry = p["notional"] * carry_giornaliero(pair, p["side"]) * _giorni_aperta(p)
-    taker, _, _ = costi_correnti()
-    netto = pnl - carry - p["notional"] * taker
-    state["shadow_cash"] = state.get("shadow_cash", 0.0) + netto
-    return netto
+    return _chiudi(state, "shadow", pair, price)
 
 
 def equity_ombra(state: dict, prices: dict) -> float:
-    eq = state.get("shadow_cash", 0.0)
-    for pair, p in state.get("shadow_positions", {}).items():
-        px = prices.get(pair)
-        if px is None:
-            continue
-        move = (px - p["entry"]) / p["entry"] * p["side"]
-        eq += p["notional"] * move
-        eq -= p["notional"] * carry_giornaliero(pair, p["side"]) * _giorni_aperta(p)
-    return eq
+    return _equity(state, "shadow", prices)
+
+
+# --------------------------------------------------------------------------
+# PORTAFOGLIO SPERIMENTALE (universo scelto dall'IA)
+#
+# Terzo portafoglio in paper. A differenza dell'ombra, che rispecchia le
+# decisioni del portafoglio vero cambiando solo la leva, questo opera su un
+# UNIVERSO DIVERSO — scelto da un modello linguistico — con lo stesso segnale
+# e lo stesso dimensionamento.
+#
+# La variabile isolata e' quindi la SELEZIONE DEI MERCATI, non la direzione
+# ne' la size. Se dopo mesi questo portafoglio batte gli altri due a parita'
+# di rischio, la selezione ragionata vale qualcosa; se non li batte, si e'
+# scoperto a costo zero.
+#
+# Non si puo' backtestare: un modello linguistico e' addestrato su testo
+# storico e lo ricorda, quindi ogni prova sul passato e' contaminata. L'unico
+# modo di saperlo e' raccogliere dati in avanti — ed e' esattamente cio' per
+# cui serve l'infrastruttura dei portafogli affiancati.
+# --------------------------------------------------------------------------
+def apri_ia(state, pair, side, price, notional, leverage):
+    _apri(state, "ia", pair, side, price, notional, leverage)
+
+
+def chiudi_ia(state, pair, price) -> float:
+    return _chiudi(state, "ia", pair, price)
+
+
+def equity_ia(state: dict, prices: dict) -> float:
+    return _equity(state, "ia", prices)
 
 
 def check_kill_switch(state: dict, eq: float, cfg: dict) -> bool:

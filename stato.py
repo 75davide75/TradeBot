@@ -112,8 +112,16 @@ def default_stato(cfg: dict) -> dict:
         "halt_reason": "",
         "paused": False,
         "conferme": {},
-        "shadow_cash": cap,          # portafoglio ombra: previsto dal design
+        "shadow_cash": cap,          # portafoglio ombra: leva fissa 1x
         "shadow_positions": {},
+        "shadow_avviato": False,
+        # Terzo portafoglio: universo scelto dall'IA, stesso segnale.
+        "ia_cash": cap,
+        "ia_positions": {},
+        "ia_avviato": False,
+        "ia_universo": [],
+        "ia_scelto_il": None,
+        "ia_motivazione": "",
         "created": datetime.now(timezone.utc).isoformat(),
         "history": [],
     }
@@ -225,6 +233,7 @@ def adegua_capitale(state: dict, cfg: dict) -> float:
     # soldi che l'ombra non ha mai ricevuto e il confronto fra i due — che e'
     # tutto il motivo per cui l'ombra esiste — sarebbe truccato.
     state["shadow_cash"] = float(state.get("shadow_cash", versato)) + delta
+    state["ia_cash"] = float(state.get("ia_cash", versato)) + delta
     journal("deposit", notional=round(delta, 2), equity=round(state["cash"], 2),
             reason=f"versamento: capitale da {versato:.2f} a {voluto:.2f} EUR",
             confirmed=True)
