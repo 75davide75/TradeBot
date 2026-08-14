@@ -235,6 +235,24 @@ def main():
     except Exception:
         righe.append("⚠️ dashboard mai pubblicata")
 
+    # --- terzo portafoglio: dire se e' spento e PERCHE'
+    #
+    # Senza questa riga, un braccio dell'esperimento fermo e un braccio rotto
+    # sono indistinguibili dall'esterno. E' gia' costato due giorni.
+    try:
+        attiva, motivo = analisi.stato_ia(CFG)
+        if attiva:
+            righe.append(f"🤖 portafoglio IA: {motivo}")
+        elif CFG.get("portafoglio_ia") is False:
+            righe.append("⚪ portafoglio IA: disattivato per scelta — "
+                         "il sistema gira con due portafogli")
+        else:
+            righe.append(f"⚠️ portafoglio IA: inattivo — {motivo}")
+            problemi.append(f"portafoglio IA inattivo ({motivo}). Per spegnerlo "
+                            'di proposito: "portafoglio_ia": false in config.json')
+    except Exception as e:
+        righe.append(f"⚠️ stato del portafoglio IA non verificabile: {e}")
+
     testa = ("🟢 <b>Tutto in ordine</b>" if not problemi
              else f"🔴 <b>{len(problemi)} "
                   f"{'PROBLEMI' if len(problemi) > 1 else 'PROBLEMA'}</b>")

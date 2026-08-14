@@ -1,4 +1,7 @@
 {
+  "_nota_ia": "false = il sistema gira con DUE portafogli (reale e ombra). Il terzo, con universo scelto da un modello linguistico, resta spento. Il campo esiste per DICHIARARE la scelta: senza, un braccio spento e uno rotto sono indistinguibili, ed e' gia' costato due giorni di indagine. Per accenderlo: mettere true e aggiungere anthropic_api_key.",
+  "portafoglio_ia": false,
+
   "_leggimi": "Copia questo file in config.json e compila i due campi telegram. config.json e' escluso da git perche' contiene un segreto.",
 
   "telegram_token": "IL_TUO_TOKEN_DA_BOTFATHER",

@@ -48,17 +48,34 @@ def _modello(cfg: dict) -> str:
         "ANTHROPIC_MODEL") or MODELLO
 
 
+def stato_ia(cfg: dict) -> tuple:
+    """
+    (attiva, motivo) — perche' il livello IA gira o non gira.
+
+    Esiste perche' l'assenza silenziosa e' costata due giorni di indagine:
+    il terzo portafoglio non partiva, non lasciava traccia nei log, e dal di
+    fuori era indistinguibile da un guasto. La differenza fra "spento per
+    scelta" e "rotto" deve essere DICHIARATA, non dedotta.
+    """
+    if cfg.get("portafoglio_ia") is False:
+        return False, "disattivato per scelta in config.json"
+    if not (cfg.get("anthropic_api_key") or os.environ.get("ANTHROPIC_API_KEY")):
+        return False, "nessuna chiave API configurata"
+    try:
+        import anthropic  # noqa: F401
+    except ImportError:
+        return False, "libreria 'anthropic' non installata (pip3 install anthropic)"
+    return True, f"attivo, modello {_modello(cfg)}"
+
+
 def _cliente(cfg: dict):
     """Restituisce un client, o None se non e' configurabile."""
+    attiva, motivo = stato_ia(cfg)
+    if not attiva:
+        print(f"[ia] livello disattivato: {motivo}")
+        return None
+    import anthropic
     chiave = cfg.get("anthropic_api_key") or os.environ.get("ANTHROPIC_API_KEY")
-    if not chiave:
-        return None
-    try:
-        import anthropic
-    except ImportError:
-        print("[ia] libreria 'anthropic' non installata: salto "
-              "(pip3 install anthropic)")
-        return None
     return anthropic.Anthropic(api_key=chiave)
 
 
