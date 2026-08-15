@@ -6,8 +6,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <!-- tema.css: palette e tipografia, condivise con la dashboard.
      ?v= va incrementato a ogni pubblicazione — GitHub Pages serve con cache. -->
-<link rel="stylesheet" href="tema.css?v=3">
-<link rel="stylesheet" href="ricerca.css?v=3"></head><body>
+<link rel="stylesheet" href="tema.css?v=4">
+<link rel="stylesheet" href="ricerca.css?v=4"></head><body>
 <div class="wrap">
 
 <div class="top">
@@ -21,8 +21,8 @@
 periodo e sull'uso dell'IA nei mercati, messa a confronto con i risultati prodotti da questo
 sistema sui suoi dati reali. Il documento nasce da una domanda precisa — <em>si possono fare
 15 € a settimana partendo da 100 €?</em> — e riporta la risposta con i conti che la sostengono.</p>
-<p class="data mono">Redatto l'11 agosto 2026 · dati: 57 mercati perpetui Kraken, 279 giorni,
-112 giorni out-of-sample</p>
+<p class="data mono">Redatto l'11 agosto 2026 · aggiornato il 15 agosto 2026 (sezioni 5 e 10)
+· dati: 57 mercati perpetui Kraken, 279 giorni, 112 giorni out-of-sample</p>
 
 <div class="toc">
   <div>Indice</div>
@@ -318,6 +318,42 @@ dell'11 agosto.</div>
 correzione sono inutilizzabili</strong>, perché il capitale ripartiva periodicamente da 100 €.
 È il motivo per cui i numeri della sezione 4 vengono da backtest e non dal registro live.</p>
 
+<h3>Un secondo buco, scoperto il 15 agosto: due portafogli su tre non lasciavano traccia</h3>
+
+<p>Progettando la pagina che affianca i tre portafogli è emerso che le funzioni di apertura e
+chiusura dei portafogli secondari <strong>non scrivevano nulla nel registro</strong>. Il registro
+— che il codice stesso chiama la fonte di verità — conteneva solo le operazioni del portafoglio
+reale. Per l'ombra e per il portafoglio sperimentale non esisteva alcuna riga: né aperture, né
+chiusure, né motivi.</p>
+
+<p>Il danno è più circoscritto di quello di agosto, e vale la pena essere precisi su dove
+comincia e dove finisce:</p>
+
+<div class="tabellabox"><table>
+<thead><tr><th>Cosa</th><th>Stato</th></tr></thead>
+<tbody>
+<tr><td>Curve di equity di ombra e sperimentale</td><td><strong class="up">valide</strong> — venivano salvate nello storico dello stato, indipendentemente dal registro</td></tr>
+<tr><td>Registro operazione per operazione dei due portafogli secondari</td><td><strong class="down">assente</strong> prima del 15/08/2026, e non ricostruibile</td></tr>
+</tbody></table></div>
+
+<p>Non ricostruibile per una ragione specifica: l'ombra rispecchia il portafoglio reale, quindi
+mercato, direzione e data di ogni sua operazione sarebbero deducibili — ma il nozionale dipendeva
+dal suo capitale in quell'istante, che non è registrato da nessuna parte. Sarebbero righe in
+parte stimate, indistinguibili dalle vere una volta messe nella stessa tabella. Un buco
+dichiarato vale più di un riempimento plausibile.</p>
+
+<div class="nota chiave"><span class="et">Risolto</span>
+Il registro ha guadagnato una colonna che dice quale portafoglio ha agito, e le funzioni dei
+portafogli secondari ora vi scrivono. Le righe precedenti hanno quella colonna vuota e valgono
+per quello che sono: operazioni del portafoglio reale, l'unico che scrivesse. La dashboard
+dichiara da quale data lo storico è completo per tutti e tre, invece di lasciar credere che gli
+altri due abbiano operato poco.</div>
+
+<p>Rilevanza per questo report: il <strong>confronto fra le curve</strong> dei tre portafogli
+regge, perché le curve non dipendevano dal registro. Non regge, e non reggerà mai per il periodo
+precedente al 15 agosto, qualunque analisi che voglia guardare <em>dentro</em> le operazioni dei
+portafogli secondari — quanto durano, a che prezzo entrano, quali motivi le hanno generate.</p>
+
 <h2 id="p6">6. Si può replicare il day trading, automatizzandolo?</h2>
 
 <p>La domanda merita una risposta articolata, perché la risposta cambia a seconda di cosa si
@@ -517,17 +553,26 @@ verifica sul passato è contaminata. Da questa conclusione non segue però che u
 linguistico sia inutile ovunque. Segue una cosa più precisa: <strong>non si può sapere in
 anticipo</strong>, e quindi l'unico modo onesto di scoprirlo è misurare in avanti.</p>
 
-<p>Dall'11 agosto 2026 il sistema fa girare <strong>tre portafogli in parallelo</strong>, sugli
-stessi dati e nello stesso istante. Differiscono per una variabile ciascuno, che è l'unica
-condizione sotto cui una differenza si può attribuire a una causa.</p>
+<p>Il sistema fa girare <strong>tre portafogli in parallelo</strong>, sugli stessi dati e nello
+stesso istante. Differiscono per una variabile ciascuno, che è l'unica condizione sotto cui una
+differenza si può attribuire a una causa.</p>
 
 <table>
-<thead><tr><th>Portafoglio</th><th>Segnale</th><th>Leva</th><th>Universo</th></tr></thead>
+<thead><tr><th>Portafoglio</th><th>Segnale</th><th>Leva</th><th>Universo</th><th>Attivo dal</th></tr></thead>
 <tbody>
-<tr><td>Reale</td><td>momentum 60g</td><td>volatility targeting</td><td>lista fissa, filtrata</td></tr>
-<tr><td>Ombra</td><td><em>identico</em></td><td>fissa 1×</td><td><em>identico</em></td></tr>
-<tr><td>Sperimentale</td><td><em>identico</em></td><td><em>identica</em></td><td>scelto da un LLM</td></tr>
+<tr><td>Reale</td><td>momentum 60g</td><td>volatility targeting</td><td>lista fissa, filtrata</td><td class="n">11/08/2026 11:13</td></tr>
+<tr><td>Ombra</td><td><em>identico</em></td><td>fissa 1×</td><td><em>identico</em></td><td class="n">11/08/2026 23:17</td></tr>
+<tr><td>Sperimentale</td><td><em>identico</em></td><td><em>identica</em></td><td>scelto da un LLM</td><td class="n">15/08/2026 13:44</td></tr>
 </tbody></table>
+
+<div class="nota attenzione"><span class="et">Le tre date non coincidono</span>
+Una versione precedente di questa sezione diceva che i tre portafogli girano in parallelo
+dall'11 agosto. Non è vero: l'ombra è partita dodici ore dopo il portafoglio reale, e quello
+sperimentale <strong>quattro giorni dopo</strong>, il 15 agosto. Per i primi quattro giorni i
+portafogli sono stati due.<br><br>
+Conta perché la finestra utile a rispondere alla domanda di questa sezione non parte dall'11
+agosto ma dal 15, e a quella data va sottratto tutto il tempo necessario perché il confronto
+smetta di essere rumore — che, come si legge sotto, si misura in mesi, non in giorni.</div>
 
 <p>La domanda che il terzo portafoglio pone è deliberatamente stretta: non "l'IA sa fare
 trading", ma <em>"la selezione dei mercati, a parità di tutto il resto, vale qualcosa?"</em>.
