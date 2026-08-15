@@ -11,10 +11,9 @@ solo. Se quel test sparisce, il confronto fra i tre torna a essere
 un'opinione — che e' esattamente cio' che i tre portafogli esistono per non
 essere.
 
-pandas e numpy non sono installati su questa macchina e core.py li importa.
-Vengono sostituiti con moduli finti: servono solo perche' le annotazioni
-'-> pd.DataFrame' vengono valutate quando la funzione viene definita. Nessuna
-delle funzioni sotto test li usa, e nessun test qui tocca la rete.
+core.py importa pandas e numpy, che qui non ci sono: finti.installa() li
+sostituisce quando mancano, e si fa da parte quando ci sono. Il perche' e le
+due trappole sono documentati in finti.py. Nessun test qui tocca la rete.
 """
 
 import csv
@@ -22,16 +21,13 @@ import importlib
 import os
 import sys
 import tempfile
-import types
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-for _nome, _attributi in (("numpy", {}), ("pandas", {"DataFrame": object})):
-    _m = types.ModuleType(_nome)
-    for _k, _v in _attributi.items():
-        setattr(_m, _k, _v)
-    sys.modules.setdefault(_nome, _m)
+import finti  # noqa: E402
+
+finti.installa()
 
 
 def carica_core(dati_dir):
@@ -46,6 +42,34 @@ def carica_core(dati_dir):
 def righe(percorso):
     with open(percorso, newline="") as f:
         return list(csv.DictReader(f))
+
+
+class TestFinti(unittest.TestCase):
+    """
+    finti.py e' infrastruttura di test, ma il modo in cui puo' sbagliare non
+    e' un problema di test: installare uno stub sopra un pandas vero
+    romperebbe il segnale sul Pi, in silenzio e solo in produzione.
+    """
+
+    def test_non_sostituisce_una_libreria_vera(self):
+        import json                             # importabile di sicuro, ovunque
+        vero = sys.modules.pop("json")          # ...e ora fuori da sys.modules
+        try:
+            sostituiti = finti.installa_questi((("json", {"DataFrame": object}),))
+            self.assertEqual(sostituiti, [])
+            self.assertFalse(finti.e_finto(sys.modules["json"]))
+            self.assertTrue(hasattr(sys.modules["json"], "loads"))
+        finally:
+            sys.modules["json"] = vero
+
+    def test_sostituisce_una_libreria_assente_e_la_marca(self):
+        nome = "libreria_che_non_esiste_davvero"
+        try:
+            sostituiti = finti.installa_questi(((nome, {"DataFrame": object}),))
+            self.assertEqual(sostituiti, [nome])
+            self.assertTrue(finti.e_finto(sys.modules[nome]))
+        finally:
+            sys.modules.pop(nome, None)
 
 
 class TestRegistrazione(unittest.TestCase):

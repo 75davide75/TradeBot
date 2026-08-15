@@ -17,9 +17,16 @@ from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import finti  # noqa: E402
+
+# Non basta che l'import riesca. Gli altri test registrano un pandas finto per
+# poter importare core.py senza la libreria vera, e quello stub resta in
+# sys.modules per tutto il processo: con la sola try/import questi test
+# credevano di avere pandas e fallivano invece di saltarsi. Qui la domanda e'
+# "ho un pandas VERO?", e la risposta richiede di distinguere lo stub.
 try:
     import pandas as pd
-    PANDAS = True
+    PANDAS = not finti.e_finto(pd)
 except ImportError:
     PANDAS = False
 

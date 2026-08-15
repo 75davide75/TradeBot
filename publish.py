@@ -31,7 +31,79 @@ DATA = os.path.join(DOCS, "data.json")
 
 # Solo questi campi escono dal journal. Whitelist, non blacklist: con una
 # blacklist basta aggiungere un campo domani per pubblicarlo per sbaglio.
-CAMPI_OP = ("ts", "action", "pair", "price", "notional", "leverage", "reason")
+CAMPI_OP = ("ts", "action", "pair", "price", "notional", "leverage",
+            "reason", "wallet")
+
+# Gli stessi cinque campi per tutti e tre i portafogli, da una funzione sola.
+# Tre whitelist copiate divergono alla prima aggiunta di campo in core.py, e
+# la copia dimenticata e' sempre quella che pubblica troppo.
+CAMPI_POS = ("side", "entry", "notional", "leverage", "opened")
+
+# Chiave nello stato -> nome pubblico del wallet. Rispecchia NOME_WALLET in
+# core.py, con in piu' il portafoglio reale, che nello stato non ha prefisso.
+WALLET = (("reale", ""), ("ombra", "shadow_"), ("ia", "ia_"))
+
+
+def posizioni_pubblicabili(grezze: dict) -> dict:
+    """Whitelist campo per campo, per un portafoglio qualsiasi."""
+    fuori = {}
+    for pair, v in (grezze or {}).items():
+        d = {k: v.get(k) for k in CAMPI_POS}
+        d["notional"] = round(v.get("notional", 0), 2)
+        fuori[pair] = d
+    return fuori
+
+
+def blocco_wallet(state: dict, eq_ora, ombra_ora, ia_ora) -> dict:
+    """
+    I tre portafogli in una forma sola, cosi' che la dashboard non debba
+    conoscere le loro differenze storiche di nome.
+
+    'avviato' distingue "non ha mai operato" da "ha operato e ha chiuso
+    tutto": nello stato sono lo stesso dizionario vuoto, e significano cose
+    opposte. Per l'IA e' la differenza fra un esperimento non ancora partito e
+    uno che sta gia' misurando.
+
+    Tutti gli accessi passano da .get(): uno state.json scritto prima che i
+    portafogli secondari esistessero non ha quelle chiavi, e leggerle come
+    state['...'] sarebbe un KeyError alla prima esecuzione dopo un
+    aggiornamento — su un processo che gira da un timer, senza nessuno davanti.
+    """
+    equity_di = {"reale": eq_ora, "ombra": ombra_ora, "ia": ia_ora}
+    fuori = {}
+    for nome, pref in WALLET:
+        posizioni = state.get(f"{pref}positions") or {}
+        avviato = (True if nome == "reale"
+                   else bool(state.get(f"{pref}avviato") or posizioni
+                             or equity_di[nome] is not None))
+        fuori[nome] = {
+            "equity": equity_di[nome],
+            "avviato": avviato,
+            "posizioni": posizioni_pubblicabili(posizioni),
+        }
+    return fuori
+
+
+def inizio_storico_wallet(percorso: str):
+    """
+    Da quando il registro contiene tutti e tre i portafogli.
+
+    Non e' una data da salvare da qualche parte: e' deducibile dal registro
+    stesso, perche' le righe scritte prima della colonna 'wallet' ce l'hanno
+    vuota e quelle scritte dopo no. Una data conservata altrove e' una data
+    che prima o poi diverge da cio' che descrive, e nessuno se ne accorge
+    perche' continua a sembrare una data valida.
+    """
+    if not os.path.exists(percorso):
+        return None
+    try:
+        with open(percorso, newline="") as f:
+            for r in csv.DictReader(f):
+                if r.get("wallet"):
+                    return r.get("ts")
+    except Exception:
+        return None
+    return None
 
 
 def costruisci() -> dict:
@@ -88,15 +160,7 @@ def costruisci() -> dict:
     # Dettaglio posizioni: serve alla dashboard per disegnare i grafici a
     # candela e calcolare il P&L in diretta nel browser. Anche qui whitelist:
     # esce solo cio' che serve al disegno.
-    pos = {}
-    for pair, v in state.get("positions", {}).items():
-        pos[pair] = {
-            "side": v.get("side"),
-            "entry": v.get("entry"),
-            "notional": round(v.get("notional", 0), 2),
-            "leverage": v.get("leverage"),
-            "opened": v.get("opened"),
-        }
+    pos = posizioni_pubblicabili(state.get("positions"))
 
     return {
         "aggiornato": datetime.now(timezone.utc).isoformat(),
@@ -120,10 +184,24 @@ def costruisci() -> dict:
         "ia_scelto_il": state.get("ia_scelto_il"),
         "eq_ora": equity[-1]["y"] if equity else cap,
         "bh_ora": bench[-1]["y"] if bench else None,
-        "ops": ops[:100],
-        "n_ops": sum(1 for o in ops if o["action"] == "close"),
+        # 250 e non 100: con tre portafogli che scrivono, cento righe
+        # coprirebbero un terzo del tempo di prima, e la tabella sembrerebbe
+        # dire che il sistema ha iniziato a operare piu' tardi di quanto abbia
+        # fatto. Pesano circa 27 KB su un data.json che sta sotto i 60.
+        "ops": ops[:250],
+        "n_ops": sum(1 for o in ops
+                     if o["action"] == "close" and (o.get("wallet") or "reale") == "reale"),
         "n_pos": len(pos),
         "posizioni": pos,
+        # I tre portafogli in forma uniforme. AGGIUNTO ai campi qui sopra, non
+        # al loro posto: data.json lo scrive il Pi e la pagina la scrive il
+        # Mac, e i due si allineano solo dopo un pull. Finche' non succede, la
+        # dashboard nuova deve poter leggere il file vecchio.
+        "wallet": blocco_wallet(state,
+                                equity[-1]["y"] if equity else cap,
+                                ombra[-1]["y"] if ombra else None,
+                                ia[-1]["y"] if ia else None),
+        "storico_wallet_dal": inizio_storico_wallet(JOURNAL_FILE),
         # L'universo serve alla dashboard per mostrare i grafici dei mercati
         # sorvegliati anche quando non c'e' nessuna posizione aperta.
         "universo": CFG.get("universe", []),
