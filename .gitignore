@@ -38,3 +38,6 @@ perp_test/dati/
 
 # Mockup di brainstorming — non vanno su un repo pubblico
 .superpowers/
+
+# Copie della dashboard con dati finti, per la verifica locale
+.verifica/
