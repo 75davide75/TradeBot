@@ -37,8 +37,15 @@ const eur=n=>n==null?'—':n.toLocaleString('it-IT',{minimumFractionDigits:2,max
 // diverse nella stessa riga, e si nota.
 const pct=n=>n==null?'—':(n>=0?'+':'')+(n*100).toLocaleString('it-IT',
   {minimumFractionDigits:2,maximumFractionDigits:2})+'%';
+// Tutti i numeri della pagina in convenzione italiana. Mescolare "200,66 €" e
+// "0.50x" nella stessa card e' il genere di dettaglio che non si sa dire cosa
+// non va, ma si vede.
+const num=(n,d=2)=>(+n).toLocaleString('it-IT',
+  {minimumFractionDigits:d,maximumFractionDigits:d});
 // Quattro decimali su BTC sono rumore, due su ADA cancellano il prezzo.
-const cifre=n=>(+n).toFixed(n<1?6:n<100?4:2);
+const cifre=n=>num(n,n<1?6:n<100?4:2);
+const leva=n=>num(n)+'x';
+const segno=n=>(n>=0?'+':'')+num(n)+' €';
 const cls=n=>n==null?'':(n>=0?'up':'down');
 
 /* I grafici sono disegnati su canvas: non ereditano niente dal CSS, quindi i
@@ -267,9 +274,9 @@ function render(){
     <td class="mono">${new Date(o.ts).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</td>
     <td><span class="pill ${CLASSE[o.action]||'cl'}">${ETICHETTA[o.action]||esc(o.action)}</span></td>
     <td>${o.action==='deposit'?'—':esc(nome(o.pair))}</td>
-    <td class="mono">${o.action!=='deposit'&&o.price?(+o.price).toFixed(4):''}</td>
-    <td class="mono">${o.notional?(+o.notional).toFixed(2)+' €':''}</td>
-    <td class="mono">${o.action!=='deposit'&&o.leverage&&+o.leverage?(+o.leverage).toFixed(2)+'x':''}</td>
+    <td class="mono">${o.action!=='deposit'&&o.price?num(+o.price,4):''}</td>
+    <td class="mono">${o.notional?eur(+o.notional):''}</td>
+    <td class="mono">${o.action!=='deposit'&&o.leverage&&+o.leverage?leva(+o.leverage):''}</td>
     <td class="why">${esc(o.reason||'')}</td></tr>`).join('')
     ||'<tr><td colspan="7" class="skel">nessuna operazione ancora</td></tr>';
 
@@ -319,45 +326,107 @@ function proiezione(){
 
   const u=stima[stima.length-1].value, lo=basso[basso.length-1].value, hi=alto[alto.length-1].value;
   const gg=r.length;
-  nota.innerHTML=`Stima corrente <b class="${u>=0?'up':'down'}">${u>=0?'+':''}${u.toFixed(1)}% annuo</b>
-    — intervallo di confidenza al 95%: da ${lo.toFixed(1)}% a ${hi.toFixed(1)}%.
+  nota.innerHTML=`Stima corrente <b class="${u>=0?'up':'down'}">${u>=0?'+':''}${num(u,1)}% annuo</b>
+    — intervallo di confidenza al 95%: da ${num(lo,1)}% a ${num(hi,1)}%.
     ${(lo<0&&hi>0)?'<b>Lo zero cade dentro questo intervallo: la stima non è ancora distinguibile da un rendimento nullo.</b>':''}
     Basata su ${gg} osservazioni. Le linee tratteggiate sono i limiti dell'incertezza, non previsioni.`;
 }
 
+/* ---- le posizioni, nella forma che ha il sistema ----
+   L'ombra rispecchia il reale 1:1: apre e chiude insieme a lui, sullo stesso
+   mercato, nella stessa direzione, allo stesso prezzo d'ingresso, cambiando
+   solo il nozionale. L'IA invece opera su un universo suo.
+
+   Da qui la struttura: reale e ombra sulla STESSA card per mercato — che e'
+   poi l'esperimento, stesso ingresso e una sola variabile diversa, con due
+   P&L a fianco — e l'IA in una sezione separata. Tre schede paritarie
+   avrebbero prodotto sedici riquadri quasi identici a coppie, e costretto a
+   tenere a mente i numeri dell'una mentre si guarda l'altra. */
+function mercatiSegnale(D){
+  const W=Object.fromEntries(walletDaDati(D).map(w=>[w.id,w.posizioni]));
+  const chiavi=o=>Object.keys(o||{});
+  const pairs=[...new Set([...chiavi(W.reale),...chiavi(W.ombra)])];
+  if(!pairs.length) return ((D.universo)||[]).map(p=>[p,{}]);
+  // null ("non pubblicato") va tenuto distinto da undefined ("non ha questa
+  // posizione"). Durante il ripiego le posizioni dell'ombra non ci sono
+  // ancora, e scrivere che l'ombra non ha la posizione sarebbe falso: ce
+  // l'ha quasi certamente, visto che rispecchia il reale.
+  return pairs.map(p=>[p,{reale:(W.reale||{})[p],
+                          ombra:W.ombra===null?null:(W.ombra||{})[p]}]);
+}
+
+function mercatiIA(D){
+  const ia=walletDaDati(D).find(w=>w.id==='ia').posizioni||{};
+  const pairs=Object.keys(ia);
+  if(pairs.length) return pairs.map(p=>[p,{ia:ia[p]}]);
+  return ((D.ia_universo)||[]).map(p=>[p,{}]);
+}
+
+// Una riga per wallet dentro la card. Tre stati, non due: 'v' assente non e'
+// zero (e' un mercato che quel portafoglio non ha), e null non e' assente
+// (e' un dato che il Pi non ha ancora pubblicato). Mostrare 0,00 € per uno
+// qualsiasi dei due sarebbe un'affermazione che non abbiamo.
+function rigaWallet(id,etichetta,colore,v){
+  if(v===null) return `<div class="wr assente" style="--wc:var(${colore})">
+      <span class="wr-n">${etichetta}</span>
+      <span class="wr-x">dato non ancora pubblicato dal Pi</span></div>`;
+  if(!v) return `<div class="wr assente" style="--wc:var(${colore})">
+      <span class="wr-n">${etichetta}</span>
+      <span class="wr-x">non ha questa posizione</span></div>`;
+  return `<div class="wr" style="--wc:var(${colore})" data-w="${id}">
+      <span class="wr-n">${etichetta}</span>
+      <span class="wr-q mono">${eur(+v.notional)} · ${leva(+v.leverage)}</span>
+      <span class="wr-p mono" data-pnl>—</span></div>`;
+}
+
+function cardMercato(p,slot,soloIA){
+  const rif=slot.reale||slot.ombra||slot.ia;
+  const righe=soloIA
+    ? rigaWallet('ia','IA','--w-ia',slot.ia)
+    : rigaWallet('reale','Reale','--w-reale',slot.reale)
+      +rigaWallet('ombra','Ombra','--w-ombra',slot.ombra);
+  return `<div class="pos" data-p="${p}">
+    <header><div><div class="sym">${nome(p)}
+      ${rif?`<span class="side ${rif.side>0?'long':'short'}">${rif.side>0?'LONG':'SHORT'}</span>`
+          :'<span class="side attesa">IN ATTESA</span>'}</div>
+      <div class="meta mono">${rif?`ingresso ${cifre(+rif.entry)}`:'nessuna posizione'}</div></div>
+      <div class="pnl"><div class="q mono" data-px>—</div></div></header>
+    <div class="chart" data-chart></div>
+    ${rif?`<div class="wrighe">${righe}</div>`:''}
+    <div class="foot"><span data-fonte class="fonte"></span>
+      ${rif?`<span>stop a ${num(-8/(+rif.leverage||1),1)}%</span>`:'<span>in osservazione</span>'}</div>
+  </div>`;
+}
+
 async function candele(){
-  const box=document.getElementById('pos');
-  const P=D.posizioni||{};
-  const aperte=Object.keys(P).length>0;
+  const seg=mercatiSegnale(D), ia=mercatiIA(D);
+  const reale=walletDaDati(D).find(w=>w.id==='reale');
+  const iaW=walletDaDati(D).find(w=>w.id==='ia');
   document.getElementById('postit').textContent=
-    aperte?'Posizioni aperte':'Mercati sorvegliati (nessuna posizione aperta)';
+    Object.keys(reale.posizioni||{}).length
+      ? 'Segnale momentum · Reale e Ombra'
+      : 'Segnale momentum · mercati sorvegliati (nessuna posizione aperta)';
+  document.getElementById('ianota').textContent=iaW.avviato ? ''
+    : "Il portafoglio sperimentale non ha ancora scelto un universo. Non mostra i mercati del reale: sarebbe un universo che questo portafoglio non ha mai avuto.";
+  await disegna(document.getElementById('pos'),seg,false);
+  await disegna(document.getElementById('posia'),ia,true);
+}
 
-  // Quando non c'e' nulla di aperto mostro comunque i grafici dell'universo:
-  // una pagina vuota non dice se il sistema sta lavorando o e' fermo.
-  const lista=mercatiMostrati();
-  if(!lista.length){box.innerHTML='<div class="skel">nessun mercato configurato</div>';return}
-
-  box.innerHTML=lista.map(([p,v])=>`
-    <div class="pos" data-p="${p}">
-      <header><div><div class="sym">${nome(p)}
-        ${v?`<span class="side ${v.side>0?'long':'short'}">${v.side>0?'LONG':'SHORT'}</span>`
-           :'<span class="side" style="background:var(--surf2);color:var(--dim)">IN ATTESA</span>'}</div>
-        <div class="meta mono">${v?`ingresso ${cifre(+v.entry)} · leva ${(+v.leverage).toFixed(2)}x`
-                                  :'nessuna posizione'}</div></div>
-        <div class="pnl"><div class="p mono" data-pnl>—</div><div class="q mono" data-px>—</div></div>
-      </header>
-      <div class="chart" data-chart></div>
-      <div class="foot"><span>${v?`nozionale ${(+v.notional).toFixed(2)} €`:'in osservazione'}</span>
-        <span data-fonte class="fonte"></span>
-        <span>${v?`stop a ${(-8/(+v.leverage||1)).toFixed(1)}%`:''}</span></div>
-    </div>`).join('');
+// Le candele si scaricano una volta per mercato: 'serie' e' indicizzata per
+// mercato, non per sezione. Il codice fa gia' al massimo tre richieste in
+// parallelo per non prendersi un rifiuto da Kraken per eccesso di traffico, e
+// moltiplicarle per il numero di sezioni romperebbe quella difesa.
+async function disegna(box,lista,soloIA){
+  if(!lista.length){box.innerHTML=
+    `<div class="skel">${soloIA?'nessun mercato scelto':'nessun mercato configurato'}</div>`;return}
+  box.innerHTML=lista.map(([p,slot])=>cardMercato(p,slot,soloIA)).join('');
 
   // Le candele storiche le prende lo spot USD di Kraken. Il perpetuo sarebbe la
   // fonte esatta, ma futures.kraken.com non manda un Access-Control-Allow-Origin
   // valido e dal browser la chiamata non parte proprio.
   const guai=[];
-  await inParallelo(lista,3,async ([p,v])=>{
-    const el=document.querySelector(`.pos[data-p="${p}"] [data-chart]`);
+  await inParallelo(lista,3,async ([p,slot])=>{
+    const el=box.querySelector(`.pos[data-p="${p}"] [data-chart]`);
     if(!el) return;
     try{
       const {dati,fonte}=await storico(p);
@@ -366,15 +435,16 @@ async function candele(){
       const s=ch.addCandlestickSeries(COLORI_CANDELA());
       perTema.push(()=>s.applyOptions(COLORI_CANDELA()));
       s.setData(dati);
-      if(v) s.createPriceLine({price:+v.entry,color:tok('--faint'),lineWidth:1,lineStyle:2,
+      const rif=slot.reale||slot.ombra||slot.ia;
+      if(rif) s.createPriceLine({price:+rif.entry,color:tok('--faint'),lineWidth:1,lineStyle:2,
         axisLabelVisible:true,title:'ingresso'});
       ch.timeScale().fitContent();
       // Copia dell'ultima candela: da qui in poi la aggiorna il flusso live.
       serie[p]={ch,s,fonte,ultima:{...dati[dati.length-1]}};
       const f=el.parentElement.querySelector('[data-fonte]');
       if(f) f.textContent=fonte;
-      // Cosi' il P&L e' gia' pieno all'apertura, senza aspettare il tasto live.
-      mostra(p,v,dati[dati.length-1].close,false);
+      // Cosi' i P&L sono gia' pieni all'apertura, senza aspettare il tasto live.
+      mostra(p,slot,dati[dati.length-1].close,false);
     }catch(e){
       el.innerHTML=`<div class="skel">grafico non disponibile — ${esc(e.message)}</div>`;
       guai.push(nome(p));
@@ -440,21 +510,30 @@ function avviso(t){
   el.innerHTML+=`<div class="note">${esc(t)}</div>`;
 }
 
-// Scrive prezzo e P&L di un mercato. 'vivo' distingue il dato in streaming
-// dall'ultima chiusura nota, perche' non valgono la stessa cosa.
-function mostra(p,v,px,vivo){
+/* Scrive prezzo e P&L di un mercato. 'vivo' distingue il dato in streaming
+   dall'ultima chiusura nota, perche' non valgono la stessa cosa.
+
+   Il secondo parametro e' uno SLOT — {reale, ombra} oppure {ia} — non una
+   posizione singola: ogni card puo' contenere due portafogli sullo stesso
+   mercato, con nozionali diversi e quindi P&L diversi. */
+function mostra(p,slot,px,vivo){
   prezzi[p]=px;
   const card=document.querySelector(`.pos[data-p="${p}"]`); if(!card) return;
-  const e=card.querySelector('[data-pnl]'), q=card.querySelector('[data-px]');
-  if(v){
+  slot=slot||{};
+  card.querySelectorAll('.wr[data-w]').forEach(riga=>{
+    const v=slot[riga.dataset.w], e=riga.querySelector('[data-pnl]');
+    if(!v||!e) return;
     const mv=(px-v.entry)/v.entry*v.side, pl=v.notional*mv;
-    e.textContent=(pl>=0?'+':'')+pl.toFixed(2)+' €';
-    e.className='p mono '+(pl>=0?'up':'down');
-    q.textContent=`${cifre(px)} (${pct(mv)})`;
-  }else{
-    e.textContent=cifre(px); e.className='p mono';
-    q.textContent=vivo?'prezzo in diretta':'ultima chiusura';
-  }
+    e.textContent=segno(pl);
+    e.className='wr-p mono '+(pl>=0?'up':'down');
+  });
+  const q=card.querySelector('[data-px]');
+  const rif=slot.reale||slot.ombra||slot.ia;
+  // La variazione percentuale e' comune ai portafogli sulla stessa card:
+  // stesso mercato e stesso prezzo d'ingresso, cambia solo quanto ci sta
+  // dentro ciascuno. E' il P&L in euro a distinguerli, ed e' nelle righe.
+  if(q) q.textContent=rif?`${cifre(px)} (${pct((px-rif.entry)/rif.entry*rif.side)})`
+                         :`${cifre(px)} · ${vivo?'in diretta':'ultima chiusura'}`;
   card.classList.toggle('vivo',!!vivo);
 }
 
@@ -487,7 +566,7 @@ function apriLive(){
     const px=+(d.markPrice ?? d.last);
     if(!Number.isFinite(px)) return;
     const p=DA_PERP[d.product_id]; if(!p) return;
-    mostra(p,(D.posizioni||{})[p],px,true);
+    mostra(p,Object.fromEntries(mercatiMostrati())[p],px,true);
     disegnaTick(p,px);
   };
 
@@ -517,9 +596,12 @@ function disegnaTick(p,px){
   try{ S.s.update({...u}) }catch(e){}
 }
 
+// L'unione delle due sezioni. Il WebSocket si iscrive a tutti i mercati dei
+// tre wallet in una volta sola: cosi' i P&L dell'IA si muovono insieme a
+// quelli del reale, senza una seconda sottoscrizione.
 function mercatiMostrati(){
-  const P=D&&D.posizioni||{};
-  return Object.keys(P).length?Object.entries(P):((D&&D.universo)||[]).map(p=>[p,null]);
+  if(!D) return [];
+  return [...mercatiSegnale(D),...mercatiIA(D)];
 }
 
 document.getElementById('live').onclick=function(){

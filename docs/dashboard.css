@@ -127,6 +127,21 @@ h2{font-size:13px;font-weight:600;color:var(--dim);letter-spacing:.04em;
   margin-left:6px;border-radius:50%;background:var(--up);
   animation:puls 1.6s ease-in-out infinite;vertical-align:middle}
 
+/* Le righe per portafoglio dentro la card di un mercato. Stesso ingresso,
+   stessa direzione, leve diverse: e' l'esperimento, e va letto su una riga
+   sola per occhio, non confrontando due card lontane. */
+.wrighe{border-top:1px solid var(--line)}
+.wr{display:flex;align-items:center;gap:10px;padding:9px 16px;font-size:12.5px;
+    border-left:3px solid var(--wc)}
+.wr+.wr{border-top:1px solid var(--line)}
+.wr-n{font-weight:600;color:var(--wc);min-width:52px}
+.wr-q{color:var(--dim);flex:1}
+.wr-p{font-weight:600}
+.wr.assente .wr-n{opacity:.55}
+.wr-x{font-size:11.5px;color:var(--faint)}
+.side.attesa{background:var(--surf2);color:var(--dim)}
+.nota-sez{font-size:12.5px;color:var(--faint);margin:-6px 0 13px;max-width:70ch}
+
 table{width:100%;border-collapse:collapse;font-size:13px}
 th{text-align:left;padding:11px 15px;color:var(--faint);font-weight:500;font-size:11.5px;
    letter-spacing:.03em;text-transform:uppercase;border-bottom:1px solid var(--line)}
