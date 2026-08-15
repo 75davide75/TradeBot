@@ -184,7 +184,14 @@ def risk_check():
         perdita = move * p["leverage"] if p["leverage"] else move
         if perdita <= -CFG["stop_loss_pct"]:
             netto = chiudi_ia(state, pair, px)
-            journal("ia_stop", pair=pair, price=px, notional=round(netto, 2),
+            # chiudi_ia registra gia' la chiusura, con il nozionale e il prezzo
+            # veri. Qui resta solo il MOTIVO, che e' l'informazione che nessuna
+            # altra riga porta. Prima questa riga scriveva il P&L netto dentro
+            # la colonna 'notional': finche' era sola in mezzo alle altre
+            # l'incoerenza non si vedeva, ma in una tabella che affianca i tre
+            # portafogli diventa un nozionale negativo accanto a nozionali veri.
+            journal("ia_stop", wallet="ia", pair=pair, price=px,
+                    equity=round(netto, 2),
                     reason=f"stop-loss portafoglio IA a {perdita:.1%}",
                     confirmed=True)
             print(f"[risk-ia] stop-loss su {pair} a {perdita:+.1%}")
