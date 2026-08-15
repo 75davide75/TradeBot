@@ -12,6 +12,7 @@ l'11 agosto 2026. Se un giorno quel test diventa scomodo e viene tolto, il
 guasto torna.
 """
 
+import csv
 import importlib
 import json
 import os
@@ -295,6 +296,92 @@ class TestOmbra(unittest.TestCase):
             st["capitale_versato"] = 200.0
             st["shadow_cash"] = 200.0
             self.assertFalse(s.allinea_ombra_se_ferma(st))
+
+
+class TestColonnaWallet(unittest.TestCase):
+    """
+    Il registro guadagna una colonna. DictWriter scrive l'intestazione solo
+    quando il file non esiste (stato.py:286), quindi senza migrazione si
+    scriverebbero undici valori sotto dieci nomi e da quel momento DictReader
+    assegnerebbe i campi sbagliati — in silenzio, sulla fonte di verita'.
+    """
+
+    VECCHIA = "ts,action,pair,side,price,notional,leverage,equity,reason,confirmed"
+
+    def _registro(self, s, fine="\r\n"):
+        with open(s.JOURNAL_FILE, "w", newline="") as f:
+            f.write(self.VECCHIA + fine)
+            f.write("2026-08-14T00:31:29+00:00,open,XLTCZEUR,-1.0,44.74,17.49,"
+                    "0.7,,segnale,True" + fine)
+
+    def test_migrazione_aggiunge_la_colonna(self):
+        with tempfile.TemporaryDirectory() as d:
+            s = carica_stato(d)
+            self._registro(s)
+            self.assertTrue(s.migra_journal_se_serve())
+            with open(s.JOURNAL_FILE, newline="") as f:
+                prima = f.readline()
+            self.assertTrue(prima.startswith(self.VECCHIA + ",wallet"))
+
+    def test_migrazione_preserva_il_terminatore(self):
+        """DictWriter usa \\r\\n. Scrivere \\n mescolerebbe i due stili."""
+        for fine in ("\r\n", "\n"):
+            with tempfile.TemporaryDirectory() as d:
+                s = carica_stato(d)
+                self._registro(s, fine)
+                s.migra_journal_se_serve()
+                with open(s.JOURNAL_FILE, "rb") as f:
+                    testa = f.read().split(b"wallet")[1][:2]
+                self.assertTrue(testa.startswith(fine.encode()),
+                                msg=f"terminatore {fine!r} non preservato")
+
+    def test_migrazione_e_idempotente(self):
+        """Il timer di pull la portera' sul Pi senza che nessuno la guardi."""
+        with tempfile.TemporaryDirectory() as d:
+            s = carica_stato(d)
+            self._registro(s)
+            self.assertTrue(s.migra_journal_se_serve())
+            dopo_una = open(s.JOURNAL_FILE, "rb").read()
+            self.assertFalse(s.migra_journal_se_serve())
+            self.assertEqual(open(s.JOURNAL_FILE, "rb").read(), dopo_una)
+
+    def test_migrazione_non_tocca_le_righe_dati(self):
+        with tempfile.TemporaryDirectory() as d:
+            s = carica_stato(d)
+            self._registro(s)
+            prima = open(s.JOURNAL_FILE, "rb").read().split(b"\r\n", 1)[1]
+            s.migra_journal_se_serve()
+            dopo = open(s.JOURNAL_FILE, "rb").read().split(b"\r\n", 1)[1]
+            self.assertEqual(prima, dopo)
+
+    def test_righe_vecchie_valgono_reale(self):
+        """Restano a dieci campi: DictReader mette None, e None e' 'reale'."""
+        with tempfile.TemporaryDirectory() as d:
+            s = carica_stato(d)
+            self._registro(s)
+            s.migra_journal_se_serve()
+            s.journal("open", wallet="ombra", pair="XLTCZEUR", notional=25.0)
+            with open(s.JOURNAL_FILE, newline="") as f:
+                righe = list(csv.DictReader(f))
+            self.assertEqual(len(righe), 2)
+            self.assertIsNone(righe[0]["wallet"])
+            self.assertEqual(righe[0]["pair"], "XLTCZEUR")     # niente slittamenti
+            self.assertEqual(righe[0]["confirmed"], "True")
+            self.assertEqual(righe[1]["wallet"], "ombra")
+
+    def test_journal_scrive_reale_per_difetto(self):
+        with tempfile.TemporaryDirectory() as d:
+            s = carica_stato(d)
+            s.journal("open", pair="XXBTZEUR", price=1.0)
+            with open(s.JOURNAL_FILE, newline="") as f:
+                righe = list(csv.DictReader(f))
+            self.assertEqual(righe[0]["wallet"], "reale")
+
+    def test_ha_operato_ignora_il_wallet(self):
+        with tempfile.TemporaryDirectory() as d:
+            s = carica_stato(d)
+            s.journal("open", wallet="ia", pair="SOLEUR", price=1.0)
+            self.assertTrue(s.ha_operato())
 
 
 if __name__ == "__main__":

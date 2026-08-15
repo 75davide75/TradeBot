@@ -90,6 +90,18 @@ def migra_se_serve(origine: str = BASE) -> list:
         shutil.move(vecchio_report, REPORT_DIR)
         mossi.append("report/")
         print(f"[dati] spostata report/ in {DATA_DIR}")
+
+    # Anche journal() la richiama da sola, quindi la migrazione avverrebbe
+    # comunque alla prima scrittura. Qui serve perche' avvenga all'AVVIO, e
+    # finisca nel log: una migrazione che si vede e' una migrazione che si puo'
+    # verificare.
+    #
+    # Il suo esito NON entra in 'mossi': questa lista dice quali FILE sono
+    # stati spostati, e chi la legge ci itera sopra stampando "migrato <nome>".
+    # Infilarci la descrizione di una migrazione di schema la trasformerebbe in
+    # una lista di cose eterogenee — che e' il modo in cui un valore di ritorno
+    # smette di avere un tipo. Il log lo scrive migra_journal_se_serve.
+    migra_journal_se_serve()
     return mossi
 
 
@@ -273,16 +285,73 @@ def save_state(state: dict) -> None:
     os.replace(tmp, STATE_FILE)   # scrittura atomica: niente stato corrotto
 
 
-def journal(action: str, **campi) -> None:
-    """Ogni decisione viene scritta qui. Il journal e' la fonte di verita'."""
+# Undici colonne: 'wallet' e' l'ultima, e non e' un dettaglio estetico. Le
+# righe scritte prima che esistesse ne hanno dieci, e DictReader restituisce
+# None per quella mancante. Mettendola in fondo, quelle righe restano leggibili
+# senza riscriverle: nessun campo slitta di posto.
+COLONNE_JOURNAL = ["ts", "action", "pair", "side", "price", "notional",
+                   "leverage", "equity", "reason", "confirmed", "wallet"]
+
+
+def migra_journal_se_serve() -> bool:
+    """
+    Aggiunge 'wallet' all'intestazione del registro. Una volta sola, e
+    riscrivendo SOLO la prima riga.
+
+    Serve perche' DictWriter scrive l'intestazione unicamente quando il file
+    non esiste: senza migrazione, da qui in avanti finirebbero undici valori
+    sotto dieci nomi, e ogni lettura successiva assegnerebbe i campi sbagliati.
+    Sul registro, che e' l'unica cosa di valore che questo sistema produce.
+
+    Le righe dati non vengono toccate. Riscrivere tutto il file metterebbe a
+    rischio ogni riga in cambio di un allineamento puramente cosmetico: chi
+    legge tratta il campo mancante come 'reale', che e' cio' che quelle righe
+    sono, visto che per tutta la loro esistenza il reale era l'unico a
+    scrivere.
+
+    Idempotente di proposito: il timer di pull la porta sul Pi e la esegue
+    senza che nessuno stia guardando.
+    """
+    if not os.path.exists(JOURNAL_FILE):
+        return False
+    with open(JOURNAL_FILE, newline="") as f:
+        prima = f.readline()
+    if not prima.strip():
+        return False
+    # Il terminatore va rilevato, non deciso: DictWriter scrive \r\n, un file
+    # fatto a mano ha \n, e mescolarli dentro lo stesso registro e' il genere
+    # di danno che si scopre mesi dopo.
+    fine = "\r\n" if prima.endswith("\r\n") else "\n"
+    intestazione = prima.rstrip("\r\n").split(",")
+    if "wallet" in intestazione:
+        return False
+    tmp = JOURNAL_FILE + ".tmp"
+    with open(JOURNAL_FILE, newline="") as sorgente, \
+            open(tmp, "w", newline="") as dest:
+        sorgente.readline()                    # scarta la vecchia intestazione
+        dest.write(",".join(intestazione + ["wallet"]) + fine)
+        shutil.copyfileobj(sorgente, dest)     # le righe dati passano identiche
+    os.replace(tmp, JOURNAL_FILE)              # atomica, come save_state
+    print(f"[registro] aggiunta la colonna 'wallet' a {JOURNAL_FILE}")
+    return True
+
+
+def journal(action: str, wallet: str = "reale", **campi) -> None:
+    """
+    Ogni decisione viene scritta qui. Il journal e' la fonte di verita'.
+
+    'wallet' dice QUALE dei tre portafogli ha agito. Il valore predefinito e'
+    'reale' perche' per tutte le righe scritte finora e' stato l'unico a
+    scrivere, e le righe senza il campo sono sue.
+    """
     os.makedirs(DATA_DIR, exist_ok=True)
-    riga = {"ts": datetime.now(timezone.utc).isoformat(), "action": action}
+    migra_journal_se_serve()
+    riga = {"ts": datetime.now(timezone.utc).isoformat(),
+            "action": action, "wallet": wallet}
     riga.update(campi)
-    cols = ["ts", "action", "pair", "side", "price", "notional",
-            "leverage", "equity", "reason", "confirmed"]
     esiste = os.path.exists(JOURNAL_FILE)
     with open(JOURNAL_FILE, "a", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=cols, extrasaction="ignore")
+        w = csv.DictWriter(f, fieldnames=COLONNE_JOURNAL, extrasaction="ignore")
         if not esiste:
             w.writeheader()
         w.writerow(riga)
