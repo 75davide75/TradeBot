@@ -2,9 +2,12 @@
 
 ### 📊 [**Dashboard in diretta**](https://75davide75.github.io/TradeBot/) · 📄 [**Report tecnico**](https://75davide75.github.io/TradeBot/ricerca.html)
 
-La dashboard mostra portafoglio, posizioni aperte e grafici a candela in tempo
-reale. Il report tecnico raccoglie le evidenze pubblicate su day trading e IA
-nei mercati, confrontate con quanto misurato da questo sistema.
+La dashboard affianca i **tre portafogli** — valore, variazione ed esposizione
+long/short di ciascuno — mostra le posizioni con i grafici a candela in tempo
+reale, e tiene lo storico di tutte le operazioni dicendo quale portafoglio ha
+fatto cosa. Segue il tema chiaro o scuro del sistema. Il report tecnico
+raccoglie le evidenze pubblicate su day trading e IA nei mercati, confrontate
+con quanto misurato da questo sistema.
 
 ---
 
@@ -80,10 +83,17 @@ python3 -m unittest discover -p "test_*.py" -v
 
 | File | Cosa copre |
 |---|---|
-| `test_stato.py` | Persistenza, versamenti, blocco all'avvio, ombra |
+| `test_stato.py` | Persistenza, versamenti, blocco all'avvio, ombra, colonna `wallet` |
+| `test_portafogli.py` | Ombra e IA registrano le loro operazioni nel journal |
+| `test_publish.py` | Cosa esce in `data.json`: whitelist, blocco wallet, conteggi |
 | `test_mercati.py` | Filtro di negoziabilità: spread, volume, contratti sospesi |
 | `test_ia.py` | Livello IA e terzo portafoglio (nessuna chiamata di rete) |
 | `test_segnale.py` | Segnale (richiede pandas, sennò si salta da solo) |
+
+`test_portafogli.py` e `test_publish.py` importano `core.py`, che importa pandas
+e numpy. Dove non ci sono, `finti.py` li sostituisce con moduli finti: servono
+solo a far valutare le annotazioni, e nessuna funzione sotto test li usa. Così
+la contabilità dei portafogli è verificabile anche su una macchina spoglia.
 
 ## Comandi Telegram
 
@@ -184,7 +194,8 @@ l'informazione, ed è costata zero.
 | `daily_review.py` | Report giornaliero |
 | `backtest.py` / `run_backtest.py` | Motore di backtest sullo spot |
 | `perp_test/ricerca.py` | Ricerca sui segnali, con costi e spread reali |
-| `docs/` | Dashboard e report tecnico pubblicati su GitHub Pages |
+| `finti.py` | pandas e numpy finti per i test, dove i veri non ci sono |
+| `docs/` | Dashboard (`index.html` + `dashboard.css` + `dashboard.js`) e report tecnico, su GitHub Pages |
 | `linux/` | Servizi systemd e istruzioni d'installazione |
 
 ### Dove vivono i dati
