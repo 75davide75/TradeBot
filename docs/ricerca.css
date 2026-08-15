@@ -1,0 +1,76 @@
+/* Stili del report tecnico. Palette, reset e tipografia di base stanno in
+   tema.css, condivisi con la dashboard.
+
+   Questo e' un DOCUMENTO, non un cruscotto: la misura di colonna e' stretta
+   perche' si legge per righe, il corpo e' piu' grande e l'interlinea piu'
+   larga. Sono le uniche cose che lo distinguono dalla dashboard, ed e'
+   giusto che lo distinguano. */
+body{font-size:16.5px;line-height:1.7}
+.wrap{max-width:760px;margin:0 auto;padding:44px 22px 100px}
+
+.top{display:flex;align-items:center;justify-content:space-between;gap:16px;
+     flex-wrap:wrap;padding-bottom:22px;border-bottom:1px solid var(--line);
+     margin-bottom:36px}
+.back{font-size:13.5px}
+
+h1{font-size:34px;font-weight:700;letter-spacing:-.025em;line-height:1.2;margin-bottom:14px}
+.occhiello{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+     color:var(--w-reale);margin-bottom:14px}
+.sommario{font-size:18px;color:var(--dim);line-height:1.6;margin-bottom:8px}
+.data{font-size:12.5px;color:var(--faint);margin-top:20px}
+
+h2{font-size:22px;font-weight:600;letter-spacing:-.02em;margin:54px 0 16px;
+   padding-top:28px;border-top:1px solid var(--line)}
+h3{font-size:17px;font-weight:600;margin:32px 0 10px}
+p{margin-bottom:16px}
+ul,ol{margin:0 0 17px 22px}
+li{margin-bottom:8px}
+strong{font-weight:600}
+em{color:var(--dim)}
+
+.toc{background:var(--surf);border-radius:16px;padding:22px 26px;margin-bottom:14px;
+     box-shadow:var(--ombra-card)}
+.toc div{font-size:11.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;
+     color:var(--faint);margin-bottom:12px}
+.toc ol{margin:0 0 0 20px;font-size:15px}
+.toc li{margin-bottom:6px}
+
+table{width:100%;border-collapse:collapse;font-size:14px;margin:20px 0}
+th{text-align:left;padding:10px 12px;color:var(--faint);font-weight:500;font-size:11.5px;
+   letter-spacing:.04em;text-transform:uppercase;border-bottom:1px solid var(--line2)}
+td{padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+td.n,th.n{text-align:right;font-family:ui-monospace,'SF Mono','JetBrains Mono',monospace;
+          font-variant-numeric:tabular-nums}
+.tabellabox{overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--surf);
+     border-radius:16px;padding:6px 10px;margin:22px 0;box-shadow:var(--ombra-card)}
+.tabellabox table{margin:0}
+
+/* I richiami colorati usano color-mix sui token invece di rgba fisse: cosi'
+   restano leggibili anche in chiaro, dove uno sfondo pensato per il nero
+   diventerebbe una macchia. */
+.nota{border-left:3px solid var(--w-reale);
+      background:color-mix(in srgb,var(--w-reale) 7%,transparent);
+      padding:15px 19px;margin:24px 0;border-radius:0 12px 12px 0;font-size:15.5px}
+.attenzione{border-left-color:var(--warn);
+      background:color-mix(in srgb,var(--warn) 9%,transparent)}
+.chiave{border-left-color:var(--up);
+      background:color-mix(in srgb,var(--up) 8%,transparent)}
+.nota .et{display:block;font-size:11px;font-weight:600;letter-spacing:.08em;
+      text-transform:uppercase;color:var(--faint);margin-bottom:6px}
+
+/* Colore pieno, non smorzato: su fondo chiaro un --dim a 12,5px scende sotto
+   il 4,5:1 di contrasto, e questi blocchi sono contenuto, non decorazione. */
+pre{background:var(--surf2);border-radius:12px;padding:15px 17px;overflow-x:auto;
+    font-family:ui-monospace,'SF Mono','JetBrains Mono',monospace;font-size:12.5px;
+    line-height:1.6;color:var(--txt);margin:20px 0}
+
+.fonti{font-size:13.5px;color:var(--dim)}
+.fonti li{margin-bottom:11px}
+footer{margin-top:64px;padding-top:26px;border-top:1px solid var(--line);
+       color:var(--faint);font-size:13px;line-height:1.75}
+
+@media(max-width:640px){
+  .wrap{padding:28px 16px 70px}
+  h1{font-size:26px}h2{font-size:20px}body{font-size:16px}
+}

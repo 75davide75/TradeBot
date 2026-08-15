@@ -1,41 +1,6 @@
-/* Palette di sistema Apple, definita due volte: una per tema.
-
-   Nessun colore va scritto per valore altrove in questo file, e nemmeno in
-   dashboard.js. I grafici sono disegnati su canvas e non ereditano niente dal
-   CSS: devono poter LEGGERE da qui, e riapplicare i colori quando il tema
-   cambia. E' l'unico punto in cui il tema puo' rompersi senza dare segnale,
-   perche' il resto della pagina si adatta da solo e i grafici no. */
-:root{
-  --bg:#f5f5f7; --surf:#ffffff; --surf2:#f0f0f2;
-  --line:rgba(0,0,0,.09); --line2:rgba(0,0,0,.14);
-  --txt:#1d1d1f; --dim:#6e6e73; --faint:#8e8e93;
-  --up:#248A3D; --down:#D70015; --warn:#B25000;
-  --w-reale:#0071E3; --w-ombra:#8944AB; --w-ia:#248A3D; --bench:#C93400;
-  /* Il riempimento dell'area va dato per esteso, non calcolato in JS: finisce
-     in un fillStyle di canvas, e li' una funzione CSS non ha nessuna garanzia
-     di essere capita dalla libreria che la riceve. */
-  --w-reale-fill:rgba(0,113,227,.18);
-  --ombra-card:0 1px 2px rgba(0,0,0,.06), 0 0 0 .5px rgba(0,0,0,.05);
-}
-@media (prefers-color-scheme: dark){
-  :root{
-    --bg:#000000; --surf:#1c1c1e; --surf2:#2c2c2e;
-    --line:rgba(255,255,255,.10); --line2:rgba(255,255,255,.16);
-    --txt:#f5f5f7; --dim:#98989d; --faint:#8e8e93;
-    --up:#30D158; --down:#FF453A; --warn:#FFD60A;
-    --w-reale:#0A84FF; --w-ombra:#BF5AF2; --w-ia:#30D158; --bench:#FF9F0A;
-    --w-reale-fill:rgba(10,132,255,.22);
-    --ombra-card:none;
-  }
-}
-
-*{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--txt);
-     font:15px/1.55 -apple-system,BlinkMacSystemFont,'SF Pro Text',Inter,system-ui,sans-serif;
-     -webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+/* Stili della dashboard. La palette, il reset e la tipografia di base stanno
+   in tema.css, condivisi con il report tecnico. */
 .wrap{max-width:1180px;margin:0 auto;padding:28px 22px 80px}
-.mono{font-family:ui-monospace,'SF Mono','JetBrains Mono',monospace;
-      font-variant-numeric:tabular-nums}
 
 header{display:flex;align-items:center;justify-content:space-between;gap:16px;
        flex-wrap:wrap;margin-bottom:26px}
@@ -92,7 +57,6 @@ button.ko .dot{background:var(--down)}
 .kpi .l{font-size:11.5px;color:var(--faint);letter-spacing:.02em;margin-bottom:7px}
 .kpi .v{font-size:25px;font-weight:600;letter-spacing:-.02em;line-height:1.1}
 .kpi .d{font-size:12.5px;margin-top:5px;color:var(--dim)}
-.up{color:var(--up)}.down{color:var(--down)}
 
 .note{background:color-mix(in srgb,var(--warn) 8%,transparent);
       border:1px solid color-mix(in srgb,var(--warn) 26%,transparent);
@@ -173,6 +137,5 @@ tr:hover td{background:var(--surf2)}
 
 footer{margin-top:38px;padding-top:20px;border-top:1px solid var(--line);
        color:var(--faint);font-size:12.5px;line-height:1.75}
-a{color:var(--w-reale);text-decoration:none}a:hover{text-decoration:underline}
 .skel{color:var(--faint);padding:40px;text-align:center;font-size:13.5px}
 @media(max-width:640px){.wrap{padding:20px 15px 60px}.kpi .v{font-size:21px}}

@@ -1,0 +1,44 @@
+/* Fondamento condiviso da dashboard e report tecnico.
+
+   Sta in un file suo perche' due pagine con due copie della stessa palette
+   sono due palette che divergono: si aggiusta un colore su una, e l'altra
+   resta indietro senza che nessuno se ne accorga finche' non le si guarda
+   affiancate.
+
+   Palette di sistema Apple. Nessun colore va scritto per valore altrove — i
+   grafici della dashboard sono su canvas e non ereditano nulla dal CSS,
+   quindi devono poter LEGGERE queste variabili e riapplicarle al cambio
+   tema. */
+:root{
+  --bg:#f5f5f7; --surf:#ffffff; --surf2:#f0f0f2;
+  --line:rgba(0,0,0,.09); --line2:rgba(0,0,0,.14);
+  --txt:#1d1d1f; --dim:#6e6e73; --faint:#8e8e93;
+  --up:#248A3D; --down:#D70015; --warn:#B25000;
+  --w-reale:#0071E3; --w-ombra:#8944AB; --w-ia:#248A3D; --bench:#C93400;
+  /* Il riempimento dell'area va dato per esteso, non calcolato in JS: finisce
+     in un fillStyle di canvas, e li' una funzione CSS non ha nessuna garanzia
+     di essere capita dalla libreria che la riceve. */
+  --w-reale-fill:rgba(0,113,227,.18);
+  --ombra-card:0 1px 2px rgba(0,0,0,.06), 0 0 0 .5px rgba(0,0,0,.05);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#000000; --surf:#1c1c1e; --surf2:#2c2c2e;
+    --line:rgba(255,255,255,.10); --line2:rgba(255,255,255,.16);
+    --txt:#f5f5f7; --dim:#98989d; --faint:#8e8e93;
+    --up:#30D158; --down:#FF453A; --warn:#FFD60A;
+    --w-reale:#0A84FF; --w-ombra:#BF5AF2; --w-ia:#30D158; --bench:#FF9F0A;
+    --w-reale-fill:rgba(10,132,255,.22);
+    --ombra-card:none;
+  }
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--txt);
+     font:15px/1.55 -apple-system,BlinkMacSystemFont,'SF Pro Text',Inter,system-ui,sans-serif;
+     -webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+.mono{font-family:ui-monospace,'SF Mono','JetBrains Mono',monospace;
+      font-variant-numeric:tabular-nums}
+.up{color:var(--up)}.down{color:var(--down)}
+a{color:var(--w-reale);text-decoration:none}
+a:hover{text-decoration:underline}
