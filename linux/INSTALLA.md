@@ -33,8 +33,11 @@ Per la primissima copia, dalla cartella del progetto:
 ```bash
 rsync -avz --exclude '.git/' --exclude '__pycache__/' --exclude '*.pyc' \
       --exclude 'state.json' --exclude 'journal.csv' --exclude 'report/' \
-      ./ pi@raspberrypi.local:~/trading/
+      ./ davide@raspberrypi.local:~/trading/
 ```
+
+L'utente è quello configurato in `sync.sh` (`PI_USER`), e su questa macchina è
+`davide`. Se lo cambi, cambialo in tutti e due i posti.
 
 **Non usare `scp -r` della cartella intera:** copierebbe anche `state.json`,
 sovrascrivendo lo storico del Pi con quello del Mac. È esattamente il guasto
@@ -42,7 +45,7 @@ descritto al punto 0.
 
 ## 2. Dipendenze
 
-Collegati al Pi (`ssh pi@raspberrypi.local`) e installa:
+Collegati al Pi (`ssh davide@raspberrypi.local`) e installa:
 
 ```bash
 sudo apt update
@@ -70,35 +73,84 @@ Se arriva il messaggio di avvio su Telegram, fermalo con `Ctrl+C` e prosegui.
 
 ## 5. Installa i servizi
 
-`%i` nei file viene sostituito dal nome utente. Se il tuo utente è `pi`:
+I servizi sono **templati**: il pezzo dopo la `@` è il tuo nome utente Unix, e
+systemd lo sostituisce a `%i` dentro `User=` e nei percorsi. Quindi l'unità non
+si chiama `tradingbot@pi` per convenzione: si chiama come l'utente che la fa
+girare, e su questa macchina è `davide`.
+
+Qui sotto si usa `$USER` invece di scrivere un nome a mano. Copiaincollalo così
+com'è: è corretto su qualunque macchina, e ti risparmia l'errore descritto in
+fondo a questa pagina.
 
 ```bash
 cd ~/trading/linux
-sudo cp tradingbot.service /etc/systemd/system/tradingbot@.service
-sudo cp dailyreview.service /etc/systemd/system/dailyreview@.service
-sudo cp dailyreview.timer /etc/systemd/system/dailyreview@.timer
+for u in tradingbot dailyreview publish healthcheck gitpull; do
+  sudo cp $u.service /etc/systemd/system/$u@.service
+done
+for t in dailyreview publish healthcheck gitpull; do
+  sudo cp $t.timer /etc/systemd/system/$t@.timer
+done
 
 sudo systemctl daemon-reload
-sudo systemctl enable --now tradingbot@pi.service
-sudo systemctl enable --now dailyreview@pi.timer
+sudo systemctl enable --now tradingbot@$USER.service   # il bot, sempre attivo
+sudo systemctl enable --now dailyreview@$USER.timer    # revisione giornaliera
+sudo systemctl enable --now publish@$USER.timer        # dashboard, ogni 30 min
+sudo systemctl enable --now healthcheck@$USER.timer    # controllo delle 9:00
+sudo systemctl enable --now gitpull@$USER.timer        # aggiornamenti, ogni 20 min
+```
+
+`dashboard.service` non è in elenco: serve solo se vuoi la dashboard servita
+anche in locale dal Pi, cosa che GitHub Pages già fa. Installalo allo stesso
+modo se ti serve.
+
+**`gitpull` scarica ma non riavvia niente**, di proposito. I *dati* — la scelta
+dell'universo IA — fluiscono da soli, perché il bot rilegge quel file a ogni
+controllo. Il *codice* no: un aggiornamento entra in vigore solo al prossimo
+riavvio manuale del bot. Un sistema che esegue codice nuovo senza supervisione
+deploya da solo anche i bug.
+
+Dopo ogni `git pull` che tocchi il codice, quindi:
+
+```bash
+sudo systemctl restart tradingbot@$USER
 ```
 
 ## 6. Verifica
 
 ```bash
-systemctl status tradingbot@pi        # deve dire "active (running)"
-journalctl -u tradingbot@pi -f        # log in tempo reale, Ctrl+C per uscire
-systemctl list-timers dailyreview@pi  # quando parte la prossima revisione
+systemctl status tradingbot@$USER          # deve dire "active (running)"
+journalctl -u tradingbot@$USER -f          # log in tempo reale, Ctrl+C per uscire
+systemctl list-timers '*@'$USER            # quando parte ciascun timer
 ```
 
 ## Comandi utili
 
 | Comando | Cosa fa |
 |---|---|
-| `sudo systemctl restart tradingbot@pi` | Riavvia il bot |
-| `sudo systemctl stop tradingbot@pi` | Ferma il bot |
-| `journalctl -u tradingbot@pi -n 100` | Ultime 100 righe di log |
-| `sudo systemctl start dailyreview@pi` | Forza subito la revisione |
+| `sudo systemctl restart tradingbot@$USER` | Riavvia il bot (serve dopo ogni aggiornamento del codice) |
+| `sudo systemctl stop tradingbot@$USER` | Ferma il bot |
+| `journalctl -u tradingbot@$USER -n 100` | Ultime 100 righe di log |
+| `sudo systemctl start dailyreview@$USER` | Forza subito la revisione |
+| `sudo systemctl start publish@$USER` | Forza subito la pubblicazione della dashboard |
+| `head -1 ~/trading-dati/journal.csv` | Intestazione del registro (deve finire con `,wallet`) |
+
+## Se un servizio muore con `status=217/USER`
+
+```
+Active: activating (auto-restart) (Result: exit-code)
+Process: ExecStart=/usr/bin/python3 /home/pi/trading/bot.py (code=exited, status=217/USER)
+```
+
+Vuol dire che hai avviato l'istanza con il nome sbagliato: `tradingbot@pi`
+quando l'utente è `davide`. systemd non riesce a diventare un utente che non
+esiste, e muore **prima** di eseguire una riga di Python — quindi non ha fatto
+danni, ma cicla ogni 30 secondi e il bot vero non è stato riavviato.
+
+```bash
+whoami                                    # il nome giusto e' questo
+sudo systemctl disable --now tradingbot@pi   # ferma il fantasma
+sudo systemctl restart tradingbot@$USER      # riavvia quello vero
+```
 
 ## Note sull'affidabilità
 
@@ -124,6 +176,7 @@ Identico, ma:
 
 - crea una VM `VM.Standard.A1.Flex` (ARM, gratis a vita: 4 core / 24 GB)
 - immagine Ubuntu 22.04
-- l'utente di default è `ubuntu`, quindi usa `tradingbot@ubuntu.service`
+- l'utente di default è `ubuntu` invece di quello del Pi — ma i comandi del
+  punto 5 usano `$USER`, quindi restano corretti senza modifiche
 - non serve aprire porte in ingresso: il bot fa solo chiamate in uscita
   verso Telegram e Kraken
