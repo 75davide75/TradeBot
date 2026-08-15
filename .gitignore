@@ -35,3 +35,6 @@ venv/
 
 # dati di ricerca scaricati: 3 MB di pickle, si rigenerano con perp_test/scarica.py
 perp_test/dati/
+
+# Mockup di brainstorming — non vanno su un repo pubblico
+.superpowers/
