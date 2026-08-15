@@ -33,7 +33,10 @@ const nome=p=>MKT[p]?MKT[p].nome
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,
   c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const eur=n=>n==null?'—':n.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
-const pct=n=>n==null?'—':(n>=0?'+':'')+(n*100).toFixed(2)+'%';
+// Virgola, non punto: accanto a "200,66 €" un "+0.33%" e' due convenzioni
+// diverse nella stessa riga, e si nota.
+const pct=n=>n==null?'—':(n>=0?'+':'')+(n*100).toLocaleString('it-IT',
+  {minimumFractionDigits:2,maximumFractionDigits:2})+'%';
 // Quattro decimali su BTC sono rumore, due su ADA cancellano il prezzo.
 const cifre=n=>(+n).toFixed(n<1?6:n<100?4:2);
 const cls=n=>n==null?'':(n>=0?'up':'down');
@@ -59,6 +62,82 @@ function opzioni(){
 const COLORI_CANDELA=()=>({upColor:tok('--up'),downColor:tok('--down'),
   borderUpColor:tok('--up'),borderDownColor:tok('--down'),
   wickUpColor:tok('--up'),wickDownColor:tok('--down')});
+
+/* ---- i tre portafogli ----
+   Girano sugli stessi dati e differiscono per UNA variabile ciascuno: e' il
+   solo modo di attribuire una differenza a una causa. La dashboard esiste
+   soprattutto per affiancarli, quindi il colore di ognuno e' fisso e ritorna
+   ovunque — card, linee del grafico, bordo delle posizioni, storico. */
+const WALLET=[
+  {id:'reale', nome:'Reale', colore:'--w-reale', nota:'leva da volatility targeting'},
+  {id:'ombra', nome:'Ombra', colore:'--w-ombra', nota:'stesse decisioni, leva fissa 1x'},
+  {id:'ia',    nome:'IA',    colore:'--w-ia',    nota:'universo scelto dal modello'}];
+
+/* Il blocco 'wallet' lo scrive il Pi, questa pagina la scrive il Mac, e i due
+   si allineano solo dopo un pull: fino a cinquanta minuti, di piu' se il pull
+   fallisce. Senza questo ripiego quella finestra e' una dashboard rotta. */
+function walletDaDati(D){
+  const W=D.wallet||null;
+  return WALLET.map(w=>{
+    const d=W?(W[w.id]||null):null;
+    const legacy={reale:{equity:D.eq_ora, posizioni:D.posizioni||{}, avviato:true},
+                  ombra:{equity:D.ombra_ora, posizioni:null, avviato:D.ombra_ora!=null},
+                  ia:   {equity:D.ia_ora,    posizioni:null, avviato:D.ia_ora!=null}}[w.id];
+    const base=d||legacy;
+    return {...w, equity:base.equity, avviato:!!base.avviato,
+            // null = "non pubblicato", diverso da {} = "nessuna posizione".
+            // Confonderli mostrerebbe 0 € di esposizione su un portafoglio che
+            // potrebbe averne 200, che e' un'affermazione, non un'assenza.
+            posizioni:d?(d.posizioni||{}):legacy.posizioni};
+  });
+}
+
+function esposizione(posizioni){
+  if(!posizioni) return null;
+  const v=Object.values(posizioni);
+  const somma=f=>v.filter(f).reduce((s,p)=>s+Math.abs(+p.notional||0),0);
+  return {lorda:somma(()=>true),
+          lunga:somma(p=>p.side>0), corta:somma(p=>p.side<0),
+          nLunghe:v.filter(p=>p.side>0).length,
+          nCorte:v.filter(p=>p.side<0).length};
+}
+
+/* NON viene mostrata una "liquidita'". In questa contabilita' aprire una
+   posizione non sottrae nulla dal cash — open_position scala solo le
+   commissioni — quindi il cash resta intorno ai 200 € mentre l'esposizione e'
+   81 €, e affiancarli darebbe 281 € su un conto da 200. Un numero che sembra
+   il complemento di un altro e non lo e' vale meno di un numero assente. */
+function cardWallet(D){
+  document.getElementById('wallets').innerHTML=walletDaDati(D).map(w=>{
+    const r=w.equity==null?null:w.equity/D.capitale-1;
+    const e=esposizione(w.posizioni);
+    const q=(e&&w.equity)?e.lorda/w.equity:null;
+    const larghezza=v=>w.equity?Math.min(100,v/w.equity*100):0;
+    return `<div class="wc${w.avviato?'':' spento'}" style="--wc:var(${w.colore})">
+      <div class="wc-nome"><span class="wc-dot"></span>${w.nome}</div>
+      <div class="wc-eq mono">${w.equity==null?'—':eur(w.equity)}</div>
+      <div class="wc-pc ${w.avviato?cls(r):''}">${w.avviato?pct(r):'non ancora avviato'}</div>
+      ${!w.avviato
+        // Un portafoglio mai partito non ha esposizione, e non c'e' nessun
+        // dato da attendere: dire "in attesa" suggerirebbe che stia per
+        // arrivare un numero che non esistera' finche' non opera.
+        ? `<div class="wc-esp"><span>esposizione —</span></div>
+           <div class="wc-bar"></div>
+           <div class="wc-ls">non ha ancora operato</div>`
+        : e?`<div class="wc-esp"><span>esposizione ${eur(e.lorda)}</span>
+             <span class="mono">${q==null?'':(q*100).toFixed(0)+'%'}</span></div>
+           <div class="wc-bar">
+             <i style="width:${larghezza(e.lunga)}%;background:var(--up)"></i>
+             <i style="width:${larghezza(e.corta)}%;background:var(--down)"></i>
+           </div>
+           <div class="wc-ls">${e.lorda?`${eur(e.lunga)} long · ${e.nLunghe} · ${eur(e.corta)} short · ${e.nCorte}`
+                                       :'nessuna posizione aperta'}</div>`
+        :`<div class="wc-esp"><span>esposizione —</span></div>
+          <div class="wc-bar"></div>
+          <div class="wc-ls">in attesa che il Pi pubblichi il dato</div>`}
+      <div class="wc-nota">${w.nota}</div></div>`;
+  }).join('');
+}
 
 const ORA=3600;              // le candele sono orarie
 const GIORNI=3;              // quanto storico mostrare in ogni riquadro
@@ -105,10 +184,13 @@ function render(){
   if(D.n_ops<30) a+=`<div class="note">Solo ${D.n_ops} operazioni chiuse. Sotto le ~30 qualunque risultato è statisticamente indistinguibile dal caso: questi numeri non dicono ancora se la strategia funziona.</div>`;
   document.getElementById('alert').innerHTML=a;
 
+  cardWallet(D);
+
+  // Niente tessera "Portafoglio": ripeterebbe parola per parola la card
+  // Reale, che sta trenta pixel piu' in alto ed e' piu' grande. Qui restano
+  // solo le misure che le card non danno — il metro di paragone esterno e il
+  // conteggio delle posizioni.
   document.getElementById('kpis').innerHTML=`
-   <div class="kpi"><div class="l">Portafoglio</div>
-     <div class="v ${cls(rEq)} mono">${eur(D.eq_ora)}</div>
-     <div class="d ${cls(rEq)}">${pct(rEq)}</div></div>
    <div class="kpi"><div class="l">Solo BTC (buy &amp; hold)</div>
      <div class="v ${cls(rBh)} mono">${eur(D.bh_ora)}</div>
      <div class="d ${cls(rBh)}">${pct(rBh)}</div></div>
@@ -117,15 +199,11 @@ function render(){
      <div class="d">${diff==null?'dati insufficienti':(diff>=0?'meglio di BTC':'peggio di BTC')}</div></div>
    <div class="kpi"><div class="l">Posizioni aperte</div>
      <div class="v mono">${D.n_pos}</div>
-     <div class="d">${D.n_ops} chiuse finora</div></div>
-   ${D.ombra_ora==null?'':`
-   <div class="kpi"><div class="l">Senza volatility targeting</div>
-     <div class="v ${cls(D.ombra_ora/D.capitale-1)} mono">${eur(D.ombra_ora)}</div>
-     <div class="d">portafoglio ombra, leva fissa 1x</div></div>`}
-   ${D.ia_ora==null?'':`
-   <div class="kpi"><div class="l">Mercati scelti dall'IA</div>
-     <div class="v ${cls(D.ia_ora/D.capitale-1)} mono">${eur(D.ia_ora)}</div>
-     <div class="d">portafoglio sperimentale</div></div>`}`;
+     <div class="d">${D.n_ops} chiuse finora</div></div>`;
+   // Le tessere "Senza volatility targeting" e "Mercati scelti dall'IA" sono
+   // sparite da qui: erano due portafogli descritti dalla loro variabile
+   // invece che chiamati per nome, in coda a una fila di KPI del reale. Ora
+   // sono card, accanto al reale e alla stessa dimensione.
 
   const eqEl=document.getElementById('eq'); eqEl.innerHTML='';
   const ch=crea(eqEl);

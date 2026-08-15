@@ -65,6 +65,28 @@ button.attesa .dot{background:var(--warn);animation:puls .9s ease-in-out infinit
 button.ko .dot{background:var(--down)}
 @keyframes puls{0%,100%{opacity:1}50%{opacity:.25}}
 
+/* I tre portafogli, sempre in vista. Il confronto fra loro e' la ragione per
+   cui questo sistema esiste: non deve costare un click. */
+.wallets{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:22px}
+.wc{background:var(--surf);border-radius:16px;padding:16px 18px;position:relative;
+    overflow:hidden;box-shadow:var(--ombra-card)}
+.wc::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--wc)}
+.wc.spento{opacity:.5}
+.wc-nome{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;
+         letter-spacing:.05em;text-transform:uppercase;color:var(--wc);margin-bottom:8px}
+.wc-dot{width:7px;height:7px;border-radius:50%;background:var(--wc)}
+.wc-eq{font-size:26px;font-weight:600;letter-spacing:-.02em;line-height:1.1}
+.wc-pc{font-size:13px;margin-top:3px;color:var(--faint)}
+.wc-esp{display:flex;justify-content:space-between;font-size:12px;
+        color:var(--dim);margin-top:12px}
+.wc-bar{height:5px;border-radius:3px;background:var(--surf2);margin-top:6px;
+        overflow:hidden;display:flex}
+.wc-bar i{display:block;height:100%}
+.wc-ls{font-size:11px;color:var(--faint);margin-top:6px}
+.wc-nota{font-size:11px;color:var(--faint);margin-top:10px;
+         padding-top:9px;border-top:1px solid var(--line)}
+@media(max-width:760px){.wallets{grid-template-columns:1fr}}
+
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(178px,1fr));gap:12px;margin-bottom:24px}
 .kpi{background:var(--surf);border-radius:16px;padding:15px 17px;box-shadow:var(--ombra-card)}
 .kpi .l{font-size:11.5px;color:var(--faint);letter-spacing:.02em;margin-bottom:7px}
