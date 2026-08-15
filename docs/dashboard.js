@@ -62,8 +62,39 @@ function opzioni(){
     grid:{vertLines:{color:tok('--line')},horzLines:{color:tok('--line')}},
     rightPriceScale:{borderColor:tok('--line')},
     timeScale:{borderColor:tok('--line')},
+    // Il crosshair deve dire GIORNO E ORA, non solo il giorno: su una serie
+    // che campiona ogni 15 minuti, sapere "11 agosto" non distingue novanta
+    // punti diversi.
+    localization:{locale:'it-IT',
+      timeFormatter:t=>new Date(t*1000).toLocaleString('it-IT',
+        {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})},
     crosshair:{mode:1,vertLine:{color:tok('--line2'),labelBackgroundColor:tok('--surf2')},
                horzLine:{color:tok('--line2'),labelBackgroundColor:tok('--surf2')}}};
+}
+
+/* Asse temporale con l'ora, per le serie storiche del portafoglio.
+
+   I punti dell'equity distano circa 15 minuti — e' check_interval_min, il
+   ritmo con cui il bot guarda il mercato. Con timeVisible l'asse mostra le
+   date quando sei largo e passa agli orari quando stringi, e il crosshair da'
+   l'ora esatta di ogni punto.
+
+   Nessun dettaglio sotto i 15 minuti: sarebbe una griglia piu' fitta della
+   misura che rappresenta, cioe' tacche fra punti che non esistono. */
+function opzioniConOrario(){
+  const o = opzioni();
+  return {...o, timeScale:{...o.timeScale, timeVisible:true, secondsVisible:false,
+    // Le tacche dell'asse NON passano da localization.timeFormatter: hanno un
+    // formatter loro, e quello predefinito disegna in UTC. Senza questa
+    // funzione l'asse direbbe 14:14 dove il crosshair dice 16:57 — due orari
+    // diversi per lo stesso punto, sullo stesso grafico. Qui si legge sempre
+    // l'ora dell'orologio di chi guarda.
+    tickMarkFormatter:(t,tipo)=>{
+      const d=new Date(t*1000);
+      if(tipo<=1) return d.toLocaleDateString('it-IT',{month:'short',year:'numeric'});
+      if(tipo===2) return d.toLocaleDateString('it-IT',{day:'numeric',month:'short'});
+      return d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
+    }}};
 }
 
 const COLORI_CANDELA=()=>({upColor:tok('--up'),downColor:tok('--down'),
@@ -160,10 +191,17 @@ function pulisci(){
   grafici=[]; perTema.length=0; serie={};
 }
 
-function crea(el,extra){
-  const c=LightweightCharts.createChart(el,{...opzioni(),autoSize:true,...extra});
+/* 'fabbrica' e' la funzione che produce le opzioni, non le opzioni gia' fatte.
+
+   Serve perche' la stessa funzione va richiamata al cambio tema: se un grafico
+   nasce con opzioniConOrario() e al cambio tema gli si applica opzioni(), gli
+   si spegne l'asse orario insieme al ricoloro. Un difetto che si vede solo
+   passando da chiaro a scuro, cioe' quasi mai, e mai da chi l'ha scritto. */
+function crea(el,fabbrica){
+  const f=fabbrica||opzioni;
+  const c=LightweightCharts.createChart(el,{...f(),autoSize:true});
   grafici.push(c);
-  perTema.push(()=>c.applyOptions(opzioni()));
+  perTema.push(()=>c.applyOptions(f()));
   return c;
 }
 
@@ -213,7 +251,7 @@ function render(){
    // sono card, accanto al reale e alla stessa dimensione.
 
   const eqEl=document.getElementById('eq'); eqEl.innerHTML='';
-  const ch=crea(eqEl);
+  const ch=crea(eqEl,opzioniConOrario);
   const s1=ch.addAreaSeries({lineColor:tok('--w-reale'),
     topColor:tok('--w-reale-fill'),bottomColor:'rgba(0,0,0,0)',
     lineWidth:2,priceLineVisible:false});
@@ -357,7 +395,9 @@ function proiezione(){
     basso.push({time,value:(ann-1.96*err)*100});
   });
   const uniq=a=>a.filter((v,i,z)=>i===0||v.time>z[i-1].time);
-  const ch=crea(el);
+  // Stessa base dei tempi del grafico sopra: due assi con granularita' diverse
+  // sullo stesso periodo si leggono male quando li si confronta a occhio.
+  const ch=crea(el,opzioniConOrario);
   const b=ch.addLineSeries({color:tok('--faint'),lineWidth:1,lineStyle:2,priceLineVisible:false});
   const a=ch.addLineSeries({color:tok('--faint'),lineWidth:1,lineStyle:2,priceLineVisible:false});
   const c=ch.addLineSeries({color:tok('--w-reale'),lineWidth:2,priceLineVisible:false});
@@ -476,7 +516,7 @@ async function disegna(box,lista,soloIA){
     try{
       const {dati,fonte}=await storico(p);
       if(!dati.length) throw new Error('nessuna candela restituita');
-      const ch=crea(el,{timeScale:{...opzioni().timeScale,timeVisible:true,secondsVisible:false}});
+      const ch=crea(el,opzioniConOrario);
       const s=ch.addCandlestickSeries(COLORI_CANDELA());
       perTema.push(()=>s.applyOptions(COLORI_CANDELA()));
       s.setData(dati);
