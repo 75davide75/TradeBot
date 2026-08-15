@@ -266,25 +266,70 @@ function render(){
        ${D.ia_motivazione?`<div style="color:var(--faint)">${esc(D.ia_motivazione)}</div>`:''}`
     : '';
 
-  // 'versa' e' un versamento di capitale, non un'operazione di mercato:
-  // deve stare qui, altrimenti l'equity salta nel grafico senza spiegazione.
-  const ETICHETTA={open:'apre',close:'chiude',deposit:'versa'};
-  const CLASSE={open:'op',close:'cl',deposit:'dep'};
-  document.getElementById('ops').innerHTML=D.ops.map(o=>`<tr>
-    <td class="mono">${new Date(o.ts).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</td>
-    <td><span class="pill ${CLASSE[o.action]||'cl'}">${ETICHETTA[o.action]||esc(o.action)}</span></td>
-    <td>${o.action==='deposit'?'—':esc(nome(o.pair))}</td>
-    <td class="mono">${o.action!=='deposit'&&o.price?num(+o.price,4):''}</td>
-    <td class="mono">${o.notional?eur(+o.notional):''}</td>
-    <td class="mono">${o.action!=='deposit'&&o.leverage&&+o.leverage?leva(+o.leverage):''}</td>
-    <td class="why">${esc(o.reason||'')}</td></tr>`).join('')
-    ||'<tr><td colspan="7" class="skel">nessuna operazione ancora</td></tr>';
+  notaStorico(); filtriOps(); tabellaOps();
 
   document.getElementById('ft').innerHTML=
    `Paper trading — nessun capitale reale impiegato. Lo stato del portafoglio arriva dal Raspberry Pi, aggiornato ogni 30 minuti.<br>
     Candele orarie da Kraken spot USD (di riserva Bybit); col tasto <b>Avvia live</b> i prezzi passano al mark price dei perpetui Kraken Futures via WebSocket, quello stesso su cui il bot calcola le posizioni.<br>
     <a href="ricerca.html">Report tecnico: day trading, IA e cosa abbiamo misurato</a> ·
     <a href="https://github.com/75davide75/TradeBot">github.com/75davide75/TradeBot</a>`;
+}
+
+/* ---- lo storico, con il portafoglio che ha agito ----
+   Fino a oggi il registro conteneva un portafoglio solo, perche' _apri e
+   _chiudi non scrivevano: da qui in avanti sono tre, e la colonna dice quale. */
+let filtroWallet='tutti';
+
+const NOME_WALLET={reale:'Reale', ombra:'Ombra', ia:'IA'};
+// Le righe scritte prima della colonna 'wallet' non ce l'hanno, e sono del
+// portafoglio reale: era l'unico che scrivesse.
+const walletDi=o=>o.wallet||'reale';
+
+function tabellaOps(){
+  // 'versa' e' un versamento di capitale, non un'operazione di mercato: deve
+  // stare qui, altrimenti l'equity salta nel grafico senza spiegazione.
+  const ETICHETTA={open:'apre',close:'chiude',deposit:'versa',ia_stop:'stop'};
+  const CLASSE={open:'op',close:'cl',deposit:'dep',ia_stop:'cl'};
+  const ops=(D.ops||[]).filter(o=>filtroWallet==='tutti'||walletDi(o)===filtroWallet);
+  document.getElementById('ops').innerHTML=ops.map(o=>`<tr>
+    <td class="mono">${new Date(o.ts).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</td>
+    <td><span class="wpill" style="--wc:var(--w-${walletDi(o)})">${NOME_WALLET[walletDi(o)]||esc(walletDi(o))}</span></td>
+    <td><span class="pill ${CLASSE[o.action]||'cl'}">${ETICHETTA[o.action]||esc(o.action)}</span></td>
+    <td>${o.action==='deposit'?'—':esc(nome(o.pair))}</td>
+    <td class="mono">${o.action!=='deposit'&&o.price?num(+o.price,4):''}</td>
+    <td class="mono">${o.notional?eur(+o.notional):''}</td>
+    <td class="mono">${o.action!=='deposit'&&o.leverage&&+o.leverage?leva(+o.leverage):''}</td>
+    <td class="why">${esc(o.reason||'')}</td></tr>`).join('')
+    ||'<tr><td colspan="8" class="skel">nessuna operazione per questo filtro</td></tr>';
+}
+
+function filtriOps(){
+  const conta=id=>(D.ops||[]).filter(o=>walletDi(o)===id).length;
+  document.getElementById('filtri').innerHTML=
+    `<button class="seg${filtroWallet==='tutti'?' on':''}" data-f="tutti">Tutti · ${(D.ops||[]).length}</button>`
+    +WALLET.map(w=>`<button class="seg${filtroWallet===w.id?' on':''}" data-f="${w.id}"
+        style="--wc:var(${w.colore})"><i></i>${w.nome} · ${conta(w.id)}</button>`).join('');
+  document.querySelectorAll('#filtri .seg').forEach(b=>b.onclick=()=>{
+    filtroWallet=b.dataset.f; filtriOps(); tabellaOps();
+  });
+}
+
+/* Senza questa riga si vede il reale con decine di operazioni e l'ombra con
+   poche, e si conclude che l'ombra non abbia quasi operato: la lettura
+   esattamente sbagliata, su un confronto che e' il motivo per cui i due
+   portafogli esistono. Sparisce da sola quando anche l'operazione piu'
+   vecchia in tabella e' successiva all'inizio della registrazione, cioe'
+   quando lo storico mostrato e' integralmente completo. */
+function notaStorico(){
+  const el=document.getElementById('opsnota');
+  const dal=D.storico_wallet_dal;
+  const ops=D.ops||[];
+  const piuVecchia=ops.length?ops[ops.length-1].ts:null;
+  if(!dal||(piuVecchia&&piuVecchia>=dal)){el.textContent='';return}
+  el.innerHTML=`Le operazioni di ombra e IA sono registrate dal
+    <b>${new Date(dal).toLocaleDateString('it-IT',{day:'numeric',month:'long',year:'numeric'})}</b>.
+    Prima di quella data il registro conteneva solo il portafoglio reale:
+    i conteggi più bassi degli altri due non sono meno attività, sono meno storico.`;
 }
 
 function proiezione(){

@@ -142,6 +142,23 @@ h2{font-size:13px;font-weight:600;color:var(--dim);letter-spacing:.04em;
 .side.attesa{background:var(--surf2);color:var(--dim)}
 .nota-sez{font-size:12.5px;color:var(--faint);margin:-6px 0 13px;max-width:70ch}
 
+/* Segmented control in stile iOS, usato per filtrare lo storico. */
+.filtri{display:inline-flex;background:var(--surf2);border-radius:11px;
+        padding:3px;gap:3px;margin-bottom:12px;flex-wrap:wrap}
+.seg{font:inherit;font-size:12.5px;font-weight:500;color:var(--dim);cursor:pointer;
+     background:transparent;border:0;border-radius:8px;padding:6px 14px;
+     display:flex;align-items:center;gap:6px;transition:.15s}
+.seg:hover{color:var(--txt);background:transparent}
+.seg i{width:7px;height:7px;border-radius:50%;background:var(--wc,var(--faint))}
+.seg.on{background:var(--surf);color:var(--txt);box-shadow:var(--ombra-card)}
+.wpill{font-size:10.5px;font-weight:700;letter-spacing:.03em;padding:2.5px 8px;
+       border-radius:5px;color:var(--wc);white-space:nowrap;
+       background:color-mix(in srgb,var(--wc) 16%,transparent)}
+/* La tabella ha otto colonne: su schermo stretto scorre dentro la sua card,
+   invece di far scorrere la pagina intera in orizzontale. */
+.tabellabox{overflow-x:auto}
+.tabellabox table{min-width:720px}
+
 table{width:100%;border-collapse:collapse;font-size:13px}
 th{text-align:left;padding:11px 15px;color:var(--faint);font-weight:500;font-size:11.5px;
    letter-spacing:.03em;text-transform:uppercase;border-bottom:1px solid var(--line)}
