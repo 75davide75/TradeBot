@@ -64,6 +64,14 @@ def righe_journal(ora, giorni=7):
             for r in csv.DictReader(f):
                 if r.get("ts", "") < limite:
                     continue
+                # Solo il portafoglio reale. Da quando anche ombra e IA
+                # registrano, le righe sono circa il triplo: senza questo
+                # filtro le ultime 60 coprirebbero un terzo del tempo, e il
+                # riassunto del mattino perderebbe giorni di contesto senza
+                # che niente lo dica. Le righe scritte prima della colonna
+                # 'wallet' non ce l'hanno, e sono del reale.
+                if (r.get("wallet") or "reale") != "reale":
+                    continue
                 fuori.append({k: v for k, v in r.items() if v not in ("", None)})
     except Exception:
         return []
