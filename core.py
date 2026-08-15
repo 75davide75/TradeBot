@@ -355,6 +355,13 @@ def _giorni_aperta(p: dict) -> float:
                      datetime.fromisoformat(p["opened"])).days)
 
 
+# La chiave dello stato e' 'shadow' per ragioni storiche, ma il nome pubblico
+# del portafoglio e' 'ombra' — nel registro, in data.json e nella dashboard.
+# La traduzione avviene qui e in nessun altro posto: due mappature che possono
+# divergere sono una mappatura che prima o poi divergera'.
+NOME_WALLET = {"shadow": "ombra", "ia": "ia"}
+
+
 def _apri(state, chiave, pair, side, price, notional, leverage):
     """Apre in un portafoglio secondario qualsiasi (ombra o sperimentale)."""
     taker, apert, _ = costi_correnti()
@@ -366,6 +373,16 @@ def _apri(state, chiave, pair, side, price, notional, leverage):
         "leverage": leverage,
         "opened": datetime.now(timezone.utc).isoformat(),
     }
+    # Senza questa riga il portafoglio si muove e il registro non lo sa. E'
+    # stato cosi' per mesi: due portafogli su tre operavano senza lasciare
+    # traccia, e il confronto fra i tre — l'unica cosa che questo sistema
+    # esiste per misurare — non era ricostruibile a posteriori.
+    journal("open", wallet=NOME_WALLET[chiave], pair=pair, side=side,
+            price=price, notional=round(notional, 2), leverage=leverage,
+            equity=round(state[f"{chiave}_cash"], 2),
+            reason=("rispecchia il reale, leva fissa 1x" if chiave == "shadow"
+                    else "universo scelto dall'IA"),
+            confirmed=True)
 
 
 def _chiudi(state, chiave, pair, price) -> float:
@@ -378,6 +395,15 @@ def _chiudi(state, chiave, pair, price) -> float:
     taker, _, _ = costi_correnti()
     netto = pnl - carry - p["notional"] * taker
     state[f"{chiave}_cash"] = state.get(f"{chiave}_cash", 0.0) + netto
+    # In 'equity' va il cash di QUESTO portafoglio, non quello del reale: e' la
+    # colonna in cui close_position scrive state["cash"], e riempirla col conto
+    # sbagliato renderebbe i tre indistinguibili proprio dove devono separarsi.
+    journal("close", wallet=NOME_WALLET[chiave], pair=pair, side=p["side"],
+            price=price, notional=round(p["notional"], 2),
+            leverage=p["leverage"], equity=round(state[f"{chiave}_cash"], 2),
+            reason=("rispecchia il reale" if chiave == "shadow"
+                    else "universo scelto dall'IA"),
+            confirmed=True)
     return netto
 
 
