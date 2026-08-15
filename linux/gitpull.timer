@@ -1,0 +1,11 @@
+[Unit]
+Description=Controlla il repo ogni 20 minuti
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=20min
+# Se il Pi era spento, recupera al riavvio invece di aspettare il ciclo pieno.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

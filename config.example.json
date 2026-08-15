@@ -1,50 +1,43 @@
 {
-  "_nota_ia": "false = il sistema gira con DUE portafogli (reale e ombra). Il terzo, con universo scelto da un modello linguistico, resta spento. Il campo esiste per DICHIARARE la scelta: senza, un braccio spento e uno rotto sono indistinguibili, ed e' gia' costato due giorni di indagine. Per accenderlo: mettere true e aggiungere anthropic_api_key.",
-  "portafoglio_ia": false,
-
+  "_nota_ia": "true = attivo. La scelta dell'universo arriva da un'istanza schedulata di Claude che scrive docs/ia_universo.json: costa zero, mentre l'API costerebbe ~12 EUR/anno = il 6% di un conto da 200. Se il file manca o e' piu' vecchio di 36 ore si passa all'API, se configurata; altrimenti il sistema gira con due portafogli. false = terzo portafoglio spento di proposito.",
+  "portafoglio_ia": true,
   "_leggimi": "Copia questo file in config.json e compila i due campi telegram. config.json e' escluso da git perche' contiene un segreto.",
-
   "telegram_token": "IL_TUO_TOKEN_DA_BOTFATHER",
   "telegram_chat_id": "IL_TUO_CHAT_ID",
-
   "capital": 100.0,
-
   "_nota_leva": "max_leverage 2.0 non e' prudenza generica: viene dal backtest. A 3x il 44% dei conti simulati veniva liquidato, a 5x l'89%, a 10x il 100%.",
   "max_leverage": 2.0,
   "min_leverage": 0.25,
-
   "_nota_vol": "L'esposizione si muove inversamente alla volatilita' realizzata, mai in risposta ai profitti recenti.",
-  "target_vol": 0.20,
+  "target_vol": 0.2,
   "vol_lookback": 30,
-
   "momentum_n": 60,
   "allow_short": true,
-
   "_nota_universo": "Il numero di coppie va scelto in base al capitale: divise su troppe, le posizioni scendono sotto il minimo d'ordine Kraken e verrebbero rifiutate. Con 100 EUR ne reggiamo 8 (12.50 EUR ciascuna, sopra tutti i minimi). Con 20 EUR se ne reggevano 3. Piu' mercati indipendenti = miglior rapporto rendimento/rischio, che cresce con la radice del loro numero.",
-  "universe": ["XXBTZEUR", "XETHZEUR", "XXRPZEUR", "SOLEUR", "LINKEUR",
-               "XLTCZEUR", "ADAEUR", "DOTEUR"],
-
+  "universe": [
+    "XXBTZEUR",
+    "XETHZEUR",
+    "XXRPZEUR",
+    "SOLEUR",
+    "LINKEUR",
+    "XLTCZEUR",
+    "ADAEUR",
+    "DOTEUR"
+  ],
   "check_interval_min": 240,
-
   "_nota_kill": "Se il conto perde il 25% dal picco, il sistema si ferma e serve /resume manuale.",
   "max_drawdown_halt": 0.25,
-
   "_nota_sicurezza": "Asimmetria deliberata: le APERTURE richiedono sempre conferma umana (aggiungono rischio), le CHIUSURE si auto-eseguono dopo il timeout (tolgono rischio). Lo stop-loss non aspetta nessuno.",
   "risk_check_sec": 60,
   "stop_loss_pct": 0.08,
   "auto_close_timeout_sec": 60,
-
   "_nota_rifugio": "Il rifugio NON e' BTC: in un crollo crypto BTC scende insieme agli altcoin (correlazione 0.7-0.9). Con un conto in EUR, 'EUR' costa zero commissioni e zero rischio cambio; 'USDC' costa 0.8% andata e ritorno e aggiunge il rischio EUR/USD.",
   "safe_asset": "EUR",
-
   "_nota_negoziabilita": "Un mercato con spread enorme o volume evaporato non e' un'occasione, e' un modo per pagare il pedaggio due volte. Soglie misurate sui 57 perpetui Kraken: spread mediano 0,057%, massimo 1,279%. Lo 0,15% tiene fuori la coda illiquida e lascia dentro con margine tutti i mercati operati.",
   "spread_massimo": 0.0015,
   "volume_minimo_usd": 250000.0,
-
-  "_nota_ia": "FACOLTATIVO. Senza questa chiave il sistema funziona identico, con due portafogli invece di tre. Con la chiave si accendono: (1) il riassunto in italiano nel messaggio delle 9, (2) il terzo portafoglio, il cui universo e' scelto da un modello linguistico. L'IA non tocca mai il portafoglio reale ne' l'ombra e non decide mai una direzione: sceglie dove guardare, non cosa fare. Serve anche 'pip3 install anthropic'.",
   "anthropic_api_key": "",
   "_nota_modello": "Facoltativo. Le due chiamate giornaliere su Opus 5 costano circa 4 USD al mese: piu' di quanto un conto da 200 EUR possa ragionevolmente rendere. Su un conto in paper e' il prezzo di un esperimento, ma se pesa si puo' mettere claude-sonnet-5 o claude-haiku-4-5.",
   "anthropic_model": "claude-opus-5",
-
   "dashboard_port": 8080
 }

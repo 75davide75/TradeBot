@@ -1,0 +1,28 @@
+[Unit]
+Description=Scarica dal repo la scelta dell'universo e gli aggiornamenti
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=%i
+WorkingDirectory=/home/%i/trading
+Environment=PYTHONUNBUFFERED=1
+
+# SOLO fast-forward, e NESSUN riavvio dei servizi.
+#
+# Due scelte deliberate:
+#
+# 1. --ff-only: se la storia locale e quella remota divergono, il pull
+#    fallisce invece di tentare un merge automatico su una macchina che
+#    nessuno sta guardando. Un conflitto risolto male in automatico e' peggio
+#    di un aggiornamento saltato.
+#
+# 2. Nessun restart: i DATI possono fluire da soli (il bot rilegge il file
+#    dell'universo a ogni controllo), il CODICE no. Un sistema che scarica ed
+#    esegue codice nuovo senza supervisione deploya da solo anche i bug.
+#    Le modifiche al codice entrano in vigore al prossimo riavvio manuale.
+ExecStart=/usr/bin/git pull --ff-only
+
+StandardOutput=journal
+StandardError=journal

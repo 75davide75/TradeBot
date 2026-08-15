@@ -48,6 +48,62 @@ def _modello(cfg: dict) -> str:
         "ANTHROPIC_MODEL") or MODELLO
 
 
+UNIVERSO_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                             "docs", "ia_universo.json")
+SCELTE_LOG = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          "docs", "ia_scelte.jsonl")
+
+# Oltre questa eta' la scelta su file viene ignorata. Serve perche' il task
+# schedulato gira solo con l'app aperta: se resta spenta per giorni, il
+# portafoglio deve smettere di seguire una decisione vecchia invece di
+# congelarsi su di essa fingendo che sia attuale.
+ETA_MASSIMA_ORE = 36
+
+
+def universo_da_file(cfg: dict, candidati: dict, quanti: int):
+    """
+    Legge la scelta prodotta da un'istanza schedulata, se c'e' ed e' fresca.
+
+    Perche' esiste: un'istanza schedulata di Claude fa lo stesso lavoro di una
+    chiamata API — parte senza memoria, vede solo i dati che le passi — ma non
+    costa niente. Su un conto da 200 EUR la differenza non e' estetica: 12 EUR
+    l'anno di API sono il 6% del capitale, e falserebbero il confronto fra i
+    portafogli.
+
+    La convalida e' la stessa della via API: simboli inventati vengono scartati.
+    """
+    import json as _json
+    from datetime import datetime as _dt, timezone as _tz
+    try:
+        with open(UNIVERSO_FILE) as f:
+            d = _json.load(f)
+    except Exception:
+        return None
+
+    try:
+        quando = _dt.fromisoformat(str(d.get("scelto_il", "")).replace("Z", "+00:00"))
+        ore = (_dt.now(_tz.utc) - quando).total_seconds() / 3600
+    except Exception:
+        print("[ia] file universo senza data valida: ignorato")
+        return None
+    if ore > ETA_MASSIMA_ORE:
+        print(f"[ia] scelta su file vecchia di {ore:.0f} ore: ignorata")
+        return None
+
+    validi = [m for m in d.get("mercati", []) if m in candidati]
+    scartati = [m for m in d.get("mercati", []) if m not in candidati]
+    if scartati:
+        print(f"[ia] file: simboli non negoziabili ignorati: {scartati}")
+    if not validi:
+        print("[ia] file: nessun simbolo valido")
+        return None
+
+    return {"mercati": validi[:quanti],
+            "motivazione": d.get("motivazione", ""),
+            "fiducia": d.get("fiducia", "media"),
+            "origine": "istanza schedulata"}
+
+
 def stato_ia(cfg: dict) -> tuple:
     """
     (attiva, motivo) — perche' il livello IA gira o non gira.
@@ -59,8 +115,24 @@ def stato_ia(cfg: dict) -> tuple:
     """
     if cfg.get("portafoglio_ia") is False:
         return False, "disattivato per scelta in config.json"
+
+    # Il file prodotto da un'istanza schedulata vale quanto una chiave API,
+    # e costa zero. Se e' fresco, il livello e' attivo anche senza credenziali.
+    try:
+        import json as _json
+        from datetime import datetime as _dt, timezone as _tz
+        with open(UNIVERSO_FILE) as f:
+            d = _json.load(f)
+        q = _dt.fromisoformat(str(d["scelto_il"]).replace("Z", "+00:00"))
+        ore = (_dt.now(_tz.utc) - q).total_seconds() / 3600
+        if ore <= ETA_MASSIMA_ORE:
+            return True, f"attivo via istanza schedulata (scelta di {ore:.0f}h fa)"
+        motivo_file = f"ultima scelta su file vecchia di {ore:.0f} ore"
+    except Exception:
+        motivo_file = "nessuna scelta su file"
+
     if not (cfg.get("anthropic_api_key") or os.environ.get("ANTHROPIC_API_KEY")):
-        return False, "nessuna chiave API configurata"
+        return False, f"{motivo_file}, e nessuna chiave API configurata"
     try:
         import anthropic  # noqa: F401
     except ImportError:
@@ -187,8 +259,17 @@ def universo_proposto(cfg: dict, candidati: dict, quanti: int):
     oppure None. I simboli restituiti sono sempre validati contro i candidati:
     un modello che inventa un mercato non deve poter far aprire una posizione.
     """
+    if not candidati:
+        return None
+
+    # Prima si guarda il file: se un'istanza schedulata ha gia' scelto oggi,
+    # quella scelta vale e non si paga nessuna chiamata API.
+    da_file = universo_da_file(cfg, candidati, quanti)
+    if da_file:
+        return da_file
+
     c = _cliente(cfg)
-    if c is None or not candidati:
+    if c is None:
         return None
     try:
         r = c.messages.create(
