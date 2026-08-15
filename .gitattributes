@@ -8,3 +8,21 @@
 #
 # Regola operativa: publish.py lo lancia SOLO il Raspberry. Mai dal Mac.
 docs/data.json binary
+
+# NOTA per chi lavora dal Mac — su questa macchina docs/data.json ha anche il
+# bit 'skip-worktree' nell'indice (e' locale, non viaggia con il repo). Serve a
+# impedire che una copia stantia parta per sbaglio, ma ha un effetto collaterale
+# che non nomina la propria causa: ogni 'git pull --rebase' si ferma con
+#
+#     Esegui il commit o lo stash delle modifiche prima di cambiare branch.
+#     docs/data.json
+#
+# anche con 'git status' pulito, perche' git si rifiuta di sovrascrivere un file
+# marcato skip-worktree. Non c'e' niente da committare ne' da stashare. Si toglie
+# il bit, si riallinea, e lo si rimette:
+#
+#     git update-index --no-skip-worktree docs/data.json
+#     git pull --rebase origin main
+#     git update-index --skip-worktree docs/data.json
+#
+# Per vedere se e' attivo:  git ls-files -v docs/data.json   → 'S' se lo e'.
