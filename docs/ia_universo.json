@@ -1,21 +1,21 @@
 {
-  "scelto_il": "2026-08-15T11:41:49Z",
+  "scelto_il": "2026-08-15T11:48:53Z",
   "mercati": [
     "XXBTZEUR",
     "XETHZEUR",
     "SOLEUR",
     "XXRPZEUR",
-    "HYPEEUR",
     "LINKEUR",
     "ADAEUR",
-    "XDGEUR"
+    "AVAXEUR",
+    "DOTEUR"
   ],
-  "motivazione": "Selezione meccanica sui soli dati oggettivi del book Kraken Futures: filtro spread bid-ask <0,15% e volume 24h >250.000 USD (49 candidati su 276 PF_), poi restrizione a spread <0,03% e funding annualizzato in valore assoluto <35% per escludere i mercati dominati dal carry, infine gli otto piu' liquidi per volume quotato. Il criterio privilegia il costo di transazione e la profondita' del book, non una view direzionale: lo spread e' l'unica grandezza che il sistema paga con certezza a ogni operazione. Nessun dato di prezzo passato, momentum o notizia e' entrato nella scelta di cosa includere.",
-  "fiducia": "media",
+  "motivazione": "Selezione meccanica sui soli dati oggettivi del book Kraken Futures, ristretta ai simboli che perp.MAPPA sa effettivamente negoziare (14): filtro base spread <0,15% e volume 24h >250.000 USD, poi spread <0,03% e funding annualizzato in valore assoluto <35% per escludere i mercati dominati dal carry, infine gli otto piu' liquidi per volume quotato. Il criterio privilegia il costo di transazione e la profondita' del book: lo spread e' l'unica grandezza che il sistema paga con certezza a ogni operazione. Nessun prezzo passato, momentum o notizia e' entrato nella scelta di cosa includere. Nota: con 14 simboli mappati e 8 da scegliere, lo spazio di selezione e' quasi saturo — l'universo IA coincide con quello reale su 7 nomi su 8.",
+  "fiducia": "bassa",
   "esclusi_per_notizie": [
     {
-      "mercato": "XZECZEUR",
-      "motivo": "Overhang regolamentare UE sulle anonymity-enhancing coin (divieto MiCA applicabile dal 10/07/2027) e restrizioni gia' in essere sui prelievi shielded presso Kraken. Sarebbe stato 4o per liquidita' (12,3M USD, spread 0,022%). Escluso in via prudenziale: l'esclusione non puo' iniettare alpha, l'inclusione di un mercato a rischio sospensione si."
+      "mercato": "XXMRZEUR",
+      "motivo": "Privacy coin sotto divieto MiCA dal 10/07/2027 e gia' delistata da Kraken in piu' giurisdizioni; escluso comunque anche dal filtro spread (0,084%)."
     }
   ]
 }
