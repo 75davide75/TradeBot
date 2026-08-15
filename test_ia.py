@@ -18,6 +18,7 @@ risponde oggi un modello non e' un test, e' un sondaggio.
 import json
 import os
 import sys
+import tempfile
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -25,6 +26,37 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import analisi  # noqa: E402
 
 CFG = {"anthropic_api_key": "finta-per-i-test"}
+
+_UNIVERSO_VERO = None
+
+
+def setUpModule():
+    """
+    Questi test descrivono il livello IA SENZA una scelta su file.
+
+    Ma stato_ia() considera il livello attivo quando docs/ia_universo.json e'
+    fresco, anche senza chiave API (analisi.py:119-129), e quel file lo scrive
+    un'istanza schedulata ogni giorno. Dal primo giorno in cui l'ha scritto,
+    undici test qui hanno cominciato a vedere un livello ACCESO dove ne
+    descrivevano uno spento, arrivando a 'import anthropic' — che su una
+    macchina di sviluppo non c'e'.
+
+    L'accoppiamento era involontario: nessun test di questo file legge
+    UNIVERSO_FILE di proposito. Un test che passa o fallisce a seconda di cosa
+    ha prodotto stamattina un processo schedulato non sta misurando il codice.
+
+    Qui il percorso viene puntato su un file inesistente per la durata del
+    modulo. Un test che voglia provare la lettura da file dovra' impostarselo
+    da solo, e sara' esplicito nel farlo.
+    """
+    global _UNIVERSO_VERO
+    _UNIVERSO_VERO = analisi.UNIVERSO_FILE
+    analisi.UNIVERSO_FILE = os.path.join(
+        tempfile.gettempdir(), "tradebot-nessuna-scelta-su-file.json")
+
+
+def tearDownModule():
+    analisi.UNIVERSO_FILE = _UNIVERSO_VERO
 
 
 class Blocco:
